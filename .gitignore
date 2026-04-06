@@ -13,6 +13,7 @@ env/
 
 # Environment files
 .env
+!.env.example
 
 # OS / editor
 .DS_Store
@@ -26,3 +27,5 @@ htmlcov/
 # Local runtime artifacts
 *.log
 tmp/
+
+src/exception_ops.egg-info/
