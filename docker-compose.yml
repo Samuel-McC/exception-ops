@@ -1,0 +1,70 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: exception-ops-app
+    env_file:
+      - .env
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      TEMPORAL_HOST: temporal:7233
+      DATABASE_URL: postgresql+psycopg://exceptionops:exceptionops@db:5432/exceptionops
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - temporal
+
+  worker:
+    restart: on-failure
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: exception-ops-worker
+    env_file:
+      - .env
+    environment:
+      TEMPORAL_HOST: temporal:7233
+      DATABASE_URL: postgresql+psycopg://exceptionops:exceptionops@db:5432/exceptionops
+    command: ["python", "-m", "exception_ops.worker"]
+    depends_on:
+      - db
+      - temporal
+
+  db:
+    image: postgres:16
+    container_name: exception-ops-db
+    environment:
+      POSTGRES_DB: exceptionops
+      POSTGRES_USER: exceptionops
+      POSTGRES_PASSWORD: exceptionops
+    ports:
+      - "5432:5432"
+
+  temporal:
+    restart: on-failure
+    image: temporalio/auto-setup:latest
+    container_name: exception-ops-temporal
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: exceptionops
+      POSTGRES_PWD: exceptionops
+      POSTGRES_SEEDS: db
+    ports:
+      - "7233:7233"
+    depends_on:
+      - db
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    container_name: exception-ops-temporal-ui
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8233
+    ports:
+      - "8233:8080"
+    depends_on:
+      - temporal
