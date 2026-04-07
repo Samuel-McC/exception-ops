@@ -5,10 +5,8 @@ This document captures the main trust boundaries, assets, and expected threats f
 ## Primary assets
 
 - exception cases
-- approval decisions
 - remediation plans
-- evidence gathered from tools or external systems
-- execution attempts
+- additive AI records
 - audit records
 - AI provider credentials
 - operator identity and actions
@@ -42,6 +40,8 @@ Risk:
 Mitigation direction:
 - AI is advisory only
 - structured output contracts
+- provider/model/prompt metadata are persisted with each AI record
+- AI failures are stored explicitly instead of hidden behind fallback execution
 - deterministic execution path
 - explicit approval for risky actions
 
@@ -62,9 +62,10 @@ Risk:
 - misclassification leads to bad operator decisions
 
 Mitigation direction:
-- explicit evidence stage
+- bounded taxonomy and structured classification schema
+- clear separation between source exception fields and additive AI records
 - clear operator visibility
-- confidence/risk fields later
+- confidence/risk fields are exposed in structured AI output
 - evaluation and test fixtures later
 
 ### Secret exposure
@@ -83,5 +84,4 @@ At early stages, the main residual risks are:
 - insufficient operator controls
 - weak deployment defaults
 - immature evaluation of AI outputs
-
 

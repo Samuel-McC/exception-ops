@@ -24,8 +24,8 @@ class Settings(BaseModel):
     temporal_task_queue: str = os.getenv("TEMPORAL_TASK_QUEUE", "exception-resolution")
 
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
-    ai_provider: str = os.getenv("AI_PROVIDER", "openai")
-    ai_model: str = os.getenv("AI_MODEL", "gpt-5.4-mini")
+    ai_provider: str = os.getenv("AI_PROVIDER", "mock")
+    ai_model: str = os.getenv("AI_MODEL", "mock-heuristic-v1")
     ai_enabled: bool = _as_bool(os.getenv("AI_ENABLED", "true"), default=True)
 
     app_host: str = os.getenv("APP_HOST", "127.0.0.1")

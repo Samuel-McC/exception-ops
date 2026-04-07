@@ -4,24 +4,28 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
+from exception_ops.ai.schemas import ClassificationOutput, RemediationPlanOutput
 from exception_ops.db import get_session
 from exception_ops.db.repositories import (
     create_exception_case,
     get_exception_case_detail,
+    get_latest_ai_records,
     list_exception_cases,
     update_exception_case_workflow,
 )
 from exception_ops.domain.enums import (
+    AIRecordKind,
+    AIRecordStatus,
     AuditEventType,
     ExceptionStatus,
     ExceptionType,
     RiskLevel,
     WorkflowLifecycleState,
 )
-from exception_ops.domain.models import AuditEvent, ExceptionCase
+from exception_ops.domain.models import AIRecord, AuditEvent, ExceptionCase
 from exception_ops.temporal import (
     WorkflowStartError,
     WorkflowStarter,
@@ -66,8 +70,32 @@ class ExceptionCaseResponse(BaseModel):
     updated_at: datetime
 
 
+class ClassificationRecordResponse(BaseModel):
+    record_id: str
+    status: AIRecordStatus
+    provider: str
+    model: str
+    prompt_version: str
+    output: ClassificationOutput | None
+    failure: dict[str, Any] | None
+    created_at: datetime
+
+
+class RemediationRecordResponse(BaseModel):
+    record_id: str
+    status: AIRecordStatus
+    provider: str
+    model: str
+    prompt_version: str
+    output: RemediationPlanOutput | None
+    failure: dict[str, Any] | None
+    created_at: datetime
+
+
 class ExceptionCaseDetailResponse(ExceptionCaseResponse):
     audit_history: list[AuditEventResponse] = Field(default_factory=list)
+    latest_classification: ClassificationRecordResponse | None = None
+    latest_remediation: RemediationRecordResponse | None = None
 
 
 class ExceptionCaseListResponse(BaseModel):
@@ -109,10 +137,14 @@ async def create_exception(
             case_id=exception_case.case_id,
             temporal_workflow_id=workflow_id,
             temporal_run_id=None,
-            workflow_lifecycle_state=WorkflowLifecycleState.START_FAILED,
+            workflow_lifecycle_state=WorkflowLifecycleState.FAILED,
         )
 
-    return _build_exception_case_detail_response(exception_case, audit_history)
+    return _build_exception_case_detail_response(
+        exception_case,
+        audit_history,
+        latest_ai_records={},
+    )
 
 
 @router.get("", response_model=ExceptionCaseListResponse)
@@ -128,7 +160,8 @@ def get_exception(case_id: str, session: Session = Depends(get_session)) -> Exce
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception case not found")
 
     exception_case, audit_history = detail
-    return _build_exception_case_detail_response(exception_case, audit_history)
+    latest_ai_records = get_latest_ai_records(session, case_id)
+    return _build_exception_case_detail_response(exception_case, audit_history, latest_ai_records)
 
 
 def _build_exception_case_response(exception_case: ExceptionCase) -> ExceptionCaseResponse:
@@ -152,10 +185,17 @@ def _build_exception_case_response(exception_case: ExceptionCase) -> ExceptionCa
 def _build_exception_case_detail_response(
     exception_case: ExceptionCase,
     audit_history: list[AuditEvent],
+    latest_ai_records: dict[AIRecordKind, AIRecord],
 ) -> ExceptionCaseDetailResponse:
     return ExceptionCaseDetailResponse(
         **_build_exception_case_response(exception_case).model_dump(),
         audit_history=[_build_audit_event_response(event) for event in audit_history],
+        latest_classification=_build_classification_record_response(
+            latest_ai_records.get(AIRecordKind.CLASSIFICATION)
+        ),
+        latest_remediation=_build_remediation_record_response(
+            latest_ai_records.get(AIRecordKind.REMEDIATION)
+        ),
     )
 
 
@@ -168,3 +208,62 @@ def _build_audit_event_response(audit_event: AuditEvent) -> AuditEventResponse:
         payload_json=audit_event.payload_json,
         created_at=audit_event.created_at,
     )
+
+
+def _build_classification_record_response(
+    ai_record: AIRecord | None,
+) -> ClassificationRecordResponse | None:
+    if ai_record is None:
+        return None
+
+    output = _validate_ai_payload(ai_record, ClassificationOutput)
+    return ClassificationRecordResponse(
+        record_id=ai_record.record_id,
+        status=ai_record.status,
+        provider=ai_record.provider,
+        model=ai_record.model,
+        prompt_version=ai_record.prompt_version,
+        output=output,
+        failure=_build_failure_payload(ai_record, output is None),
+        created_at=ai_record.created_at,
+    )
+
+
+def _build_remediation_record_response(
+    ai_record: AIRecord | None,
+) -> RemediationRecordResponse | None:
+    if ai_record is None:
+        return None
+
+    output = _validate_ai_payload(ai_record, RemediationPlanOutput)
+    return RemediationRecordResponse(
+        record_id=ai_record.record_id,
+        status=ai_record.status,
+        provider=ai_record.provider,
+        model=ai_record.model,
+        prompt_version=ai_record.prompt_version,
+        output=output,
+        failure=_build_failure_payload(ai_record, output is None),
+        created_at=ai_record.created_at,
+    )
+
+
+def _validate_ai_payload(ai_record: AIRecord, payload_model: type[BaseModel]) -> BaseModel | None:
+    if ai_record.payload_json is None:
+        return None
+
+    try:
+        return payload_model.model_validate(ai_record.payload_json)
+    except ValidationError:
+        return None
+
+
+def _build_failure_payload(ai_record: AIRecord, payload_invalid: bool) -> dict[str, Any] | None:
+    if ai_record.failure_json is not None:
+        return ai_record.failure_json
+    if payload_invalid:
+        return {
+            "type": "payload_validation_error",
+            "message": "Stored AI payload did not match the expected schema.",
+        }
+    return None

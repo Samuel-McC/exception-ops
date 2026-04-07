@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from exception_ops.db import Base
 from exception_ops.domain.enums import (
+    AIRecordKind,
+    AIRecordStatus,
     AuditEventType,
     ExceptionStatus,
     ExceptionType,
@@ -45,7 +47,7 @@ class ExceptionCaseRecord(Base):
     workflow_lifecycle_state: Mapped[WorkflowLifecycleState] = mapped_column(
         SqlEnum(WorkflowLifecycleState, name="workflow_lifecycle_state", native_enum=False),
         nullable=False,
-        default=WorkflowLifecycleState.NOT_STARTED,
+        default=WorkflowLifecycleState.STARTED,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -64,6 +66,11 @@ class ExceptionCaseRecord(Base):
         back_populates="exception_case",
         cascade="all, delete-orphan",
         order_by="AuditEventRecord.created_at",
+    )
+    ai_records: Mapped[list["AIRecordRecord"]] = relationship(
+        back_populates="exception_case",
+        cascade="all, delete-orphan",
+        order_by="AIRecordRecord.created_at",
     )
 
 
@@ -90,3 +97,36 @@ class AuditEventRecord(Base):
     )
 
     exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="audit_events")
+
+
+class AIRecordRecord(Base):
+    __tablename__ = "ai_records"
+
+    record_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("exception_cases.case_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    record_kind: Mapped[AIRecordKind] = mapped_column(
+        SqlEnum(AIRecordKind, name="ai_record_kind", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[AIRecordStatus] = mapped_column(
+        SqlEnum(AIRecordStatus, name="ai_record_status", native_enum=False),
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(String(255), nullable=False)
+    model: Mapped[str] = mapped_column(String(255), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(255), nullable=False)
+    payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    failure_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        index=True,
+    )
+
+    exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="ai_records")

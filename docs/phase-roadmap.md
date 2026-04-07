@@ -22,13 +22,15 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 - stable workflow ID linkage stored on the exception case
 - run ID captured when available
 - minimal replay-safe workflow definition
-- honest `start_failed` lifecycle persistence when Temporal is unavailable
+- honest workflow failure persistence when Temporal is unavailable
 
 ## Phase 3 — AI classification and remediation
 - provider abstraction
 - structured classification
 - structured remediation memo
 - additive AI metadata
+- structured provider failure records
+- workflow-coordinated AI activity execution
 
 ## Phase 4 — Approval gate
 - approval required for medium/high-risk actions

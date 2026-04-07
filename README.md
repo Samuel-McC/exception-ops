@@ -48,13 +48,17 @@ This repo currently implements:
 - Phase 1 exception ingestion with persistence and ingest audit records
 - Phase 2 Temporal workflow kickoff on exception creation
 - stored workflow linkage on each exception case
-- minimal replay-safe workflow coordination without AI, approvals, evidence gathering, or execution yet
+- Phase 3 bounded AI classification and remediation records coordinated through workflow activities
+- additive AI persistence with structured outputs, provider/model metadata, and honest failure records
+- minimal replay-safe workflow coordination without approvals, execution, or real evidence gathering yet
 
 When `POST /exceptions` succeeds, the exception case and ingest audit record are always persisted first. The API then attempts workflow kickoff and stores one of:
 - `started`
-- `start_failed`
+- `failed`
 
 This keeps exception ingestion durable even if Temporal is temporarily unavailable.
+
+The safe local default is `AI_PROVIDER=mock`, which produces structured classification and remediation output without requiring external credentials. The OpenAI path is opt-in and remains bounded to structured outputs only.
 
 ## Design principles
 
@@ -62,6 +66,7 @@ This keeps exception ingestion durable even if Temporal is temporarily unavailab
 - deterministic execution remains authoritative
 - AI can classify, summarize, and recommend
 - AI must not autonomously approve or execute risky actions
+- AI outputs are additive records, not silent overwrites of the source exception
 - approvals remain explicit
 - auditability is a first-class requirement
 - each phase should stay small and testable

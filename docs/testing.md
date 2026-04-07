@@ -28,6 +28,7 @@ ExceptionOps should prioritize:
 - list/detail
 - workflow kickoff linkage
 - honest kickoff-failure behavior
+- detail visibility for latest AI records
 
 ### Integration tests
 - DB-backed flows
@@ -41,4 +42,5 @@ Focused tests first, full suite second.
 ## Regression-sensitive areas
 - workflow determinism
 - workflow kickoff persistence
+- AI record persistence and failure capture
 - audit record completeness

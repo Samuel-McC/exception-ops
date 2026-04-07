@@ -18,6 +18,8 @@ Initial policy:
 - operator identity should be recorded
 - AI recommendation is not approval
 - execution permission is separate from AI output
+- AI `requires_approval` is advisory metadata only in Phase 3
+- actual approval routing and wait states arrive in a later phase
 
 ## Near-term rule
 

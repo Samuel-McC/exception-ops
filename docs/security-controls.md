@@ -16,15 +16,15 @@ At this setup stage, the repo should be treated as:
 
 ## Implemented today
 
-At the earliest setup stage, implemented controls may be minimal.
-As the project grows, this document should be updated.
-
-Expected near-term implemented controls:
+Current implemented controls are still development-oriented, but they include:
 - explicit workflow state instead of hidden side effects
 - bounded AI provider abstraction
-- approval gating for risky actions
+- structured outputs only for AI generation
+- prompt version capture on persisted AI records
+- provider/model metadata capture on persisted AI records
 - environment-based secret loading
-- audit records for sensitive actions
+- mock-safe local AI default without external credentials
+- audit-style persistence for AI successes and failures
 - deterministic activity boundaries for external calls
 
 ## Planned controls
@@ -44,6 +44,8 @@ Expected near-term implemented controls:
 - structured outputs
 - provider abstraction
 - bounded prompts
+- additive persistence of AI outputs
+- AI failure visibility without hidden fallback execution
 - no autonomous risky execution
 - explicit approval for risky actions
 

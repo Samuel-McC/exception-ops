@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi.testclient import TestClient
 
+from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.remediation import generate_remediation_plan
 from tests.conftest import StubWorkflowStarter
 
 
@@ -32,6 +36,8 @@ def test_create_exception(client: TestClient, workflow_starter: StubWorkflowStar
     assert body["temporal_workflow_id"] == f"exception-resolution-{body['case_id']}"
     assert body["temporal_run_id"] == f"run-{body['case_id']}"
     assert body["workflow_lifecycle_state"] == "started"
+    assert body["latest_classification"] is None
+    assert body["latest_remediation"] is None
     assert workflow_starter.started_workflows == [(body["case_id"], body["temporal_workflow_id"])]
 
 
@@ -64,6 +70,8 @@ def test_get_exception_by_id_returns_case_and_audit_history(client: TestClient) 
     assert body["temporal_workflow_id"] == created["temporal_workflow_id"]
     assert body["temporal_run_id"] == created["temporal_run_id"]
     assert body["workflow_lifecycle_state"] == "started"
+    assert body["latest_classification"] is None
+    assert body["latest_remediation"] is None
 
 
 def test_ingest_creates_audit_record(client: TestClient) -> None:
@@ -98,12 +106,34 @@ def test_workflow_start_failure_returns_created_case_with_failed_lifecycle(
     assert body["case_id"]
     assert body["temporal_workflow_id"] == f"exception-resolution-{body['case_id']}"
     assert body["temporal_run_id"] is None
-    assert body["workflow_lifecycle_state"] == "start_failed"
+    assert body["workflow_lifecycle_state"] == "failed"
     assert len(body["audit_history"]) == 1
 
     detail = client.get(f"/exceptions/{body['case_id']}")
     assert detail.status_code == 200
-    assert detail.json()["workflow_lifecycle_state"] == "start_failed"
+    assert detail.json()["workflow_lifecycle_state"] == "failed"
+
+
+def test_get_exception_detail_returns_ai_metadata_after_ai_activities_run(
+    client: TestClient,
+    activity_db_overrides: None,
+) -> None:
+    created = client.post("/exceptions", json=_build_payload("Provider timeout 502", "payments")).json()
+
+    asyncio.run(classify_exception(created["case_id"]))
+    asyncio.run(generate_remediation_plan(created["case_id"]))
+
+    response = client.get(f"/exceptions/{created['case_id']}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workflow_lifecycle_state"] == "completed"
+    assert body["latest_classification"]["status"] == "succeeded"
+    assert body["latest_classification"]["provider"] == "mock"
+    assert body["latest_classification"]["output"]["normalized_exception_type"] == "provider_failure"
+    assert body["latest_remediation"]["status"] == "succeeded"
+    assert body["latest_remediation"]["output"]["recommended_action"] == "retry_provider_after_validation"
+    assert body["latest_remediation"]["output"]["requires_approval"] is True
 
 
 def test_get_exception_returns_404_for_missing_case(client: TestClient) -> None:

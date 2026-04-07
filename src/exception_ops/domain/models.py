@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Any
 
 from exception_ops.domain.enums import (
+    AIRecordKind,
+    AIRecordStatus,
     AuditEventType,
     ExceptionStatus,
     ExceptionType,
@@ -40,4 +42,18 @@ class AuditEvent:
     event_type: AuditEventType
     actor: str
     payload_json: JsonObject
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class AIRecord:
+    record_id: str
+    case_id: str
+    record_kind: AIRecordKind
+    status: AIRecordStatus
+    provider: str
+    model: str
+    prompt_version: str
+    payload_json: JsonObject | None
+    failure_json: JsonObject | None
     created_at: datetime

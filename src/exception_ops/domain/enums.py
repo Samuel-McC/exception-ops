@@ -28,6 +28,16 @@ class AuditEventType(StrEnum):
 
 
 class WorkflowLifecycleState(StrEnum):
-    NOT_STARTED = "not_started"
     STARTED = "started"
-    START_FAILED = "start_failed"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AIRecordKind(StrEnum):
+    CLASSIFICATION = "classification"
+    REMEDIATION = "remediation"
+
+
+class AIRecordStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"

@@ -9,7 +9,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from exception_ops.activities import classification as classification_activity
+from exception_ops.activities import remediation as remediation_activity
 from exception_ops.api.app import app
+from exception_ops.config import settings
 from exception_ops.db import Base, get_session
 from exception_ops.db import models as db_models  # noqa: F401
 from exception_ops.temporal import WorkflowStartError, WorkflowStartResult, get_workflow_starter
@@ -29,6 +32,27 @@ class StubWorkflowStarter:
             workflow_id=workflow_id,
             run_id=f"run-{case_id}",
         )
+
+
+@pytest.fixture(autouse=True)
+def reset_ai_settings() -> Generator[None, None, None]:
+    original = {
+        "ai_enabled": settings.ai_enabled,
+        "ai_provider": settings.ai_provider,
+        "ai_model": settings.ai_model,
+        "openai_api_key": settings.openai_api_key,
+    }
+    settings.ai_enabled = True
+    settings.ai_provider = "mock"
+    settings.ai_model = "mock-heuristic-v1"
+    settings.openai_api_key = ""
+    try:
+        yield
+    finally:
+        settings.ai_enabled = original["ai_enabled"]
+        settings.ai_provider = original["ai_provider"]
+        settings.ai_model = original["ai_model"]
+        settings.openai_api_key = original["openai_api_key"]
 
 
 @pytest.fixture()
@@ -51,6 +75,15 @@ def session_factory() -> Generator[sessionmaker[Session], None, None]:
 @pytest.fixture()
 def workflow_starter() -> StubWorkflowStarter:
     return StubWorkflowStarter()
+
+
+@pytest.fixture()
+def activity_db_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+    session_factory: sessionmaker[Session],
+) -> None:
+    monkeypatch.setattr(classification_activity, "get_session_factory", lambda: session_factory)
+    monkeypatch.setattr(remediation_activity, "get_session_factory", lambda: session_factory)
 
 
 @pytest.fixture()
