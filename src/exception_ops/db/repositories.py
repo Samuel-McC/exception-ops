@@ -7,7 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from exception_ops.db.models import AuditEventRecord, ExceptionCaseRecord
-from exception_ops.domain.enums import AuditEventType, ExceptionStatus, ExceptionType, RiskLevel
+from exception_ops.domain.enums import (
+    AuditEventType,
+    ExceptionStatus,
+    ExceptionType,
+    RiskLevel,
+    WorkflowLifecycleState,
+)
 from exception_ops.domain.models import AuditEvent, ExceptionCase
 
 
@@ -35,6 +41,7 @@ def create_exception_case(
         source_system=source_system,
         external_reference=external_reference,
         raw_context_json=dict(raw_context_json),
+        workflow_lifecycle_state=WorkflowLifecycleState.NOT_STARTED,
     )
     audit_event = AuditEventRecord(
         event_id=str(uuid4()),
@@ -55,6 +62,28 @@ def create_exception_case(
     session.refresh(audit_event)
 
     return _to_domain_case(exception_case), [_to_domain_audit_event(audit_event)]
+
+
+def update_exception_case_workflow(
+    session: Session,
+    *,
+    case_id: str,
+    temporal_workflow_id: str,
+    workflow_lifecycle_state: WorkflowLifecycleState,
+    temporal_run_id: str | None = None,
+) -> ExceptionCase:
+    record = session.get(ExceptionCaseRecord, case_id)
+    if record is None:
+        raise ValueError(f"Exception case not found: {case_id}")
+
+    record.temporal_workflow_id = temporal_workflow_id
+    record.temporal_run_id = temporal_run_id
+    record.workflow_lifecycle_state = workflow_lifecycle_state
+
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return _to_domain_case(record)
 
 
 def list_exception_cases(session: Session) -> list[ExceptionCase]:
@@ -93,6 +122,9 @@ def _to_domain_case(record: ExceptionCaseRecord) -> ExceptionCase:
         source_system=record.source_system,
         external_reference=record.external_reference,
         raw_context_json=dict(record.raw_context_json or {}),
+        temporal_workflow_id=record.temporal_workflow_id,
+        temporal_run_id=record.temporal_run_id,
+        workflow_lifecycle_state=record.workflow_lifecycle_state,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )

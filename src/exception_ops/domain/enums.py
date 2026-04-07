@@ -25,3 +25,9 @@ class RiskLevel(StrEnum):
 
 class AuditEventType(StrEnum):
     INGESTED = "ingested"
+
+
+class WorkflowLifecycleState(StrEnum):
+    NOT_STARTED = "not_started"
+    STARTED = "started"
+    START_FAILED = "start_failed"

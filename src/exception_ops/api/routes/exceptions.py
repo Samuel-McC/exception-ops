@@ -8,9 +8,26 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from exception_ops.db import get_session
-from exception_ops.db.repositories import create_exception_case, get_exception_case_detail, list_exception_cases
-from exception_ops.domain.enums import AuditEventType, ExceptionStatus, ExceptionType, RiskLevel
+from exception_ops.db.repositories import (
+    create_exception_case,
+    get_exception_case_detail,
+    list_exception_cases,
+    update_exception_case_workflow,
+)
+from exception_ops.domain.enums import (
+    AuditEventType,
+    ExceptionStatus,
+    ExceptionType,
+    RiskLevel,
+    WorkflowLifecycleState,
+)
 from exception_ops.domain.models import AuditEvent, ExceptionCase
+from exception_ops.temporal import (
+    WorkflowStartError,
+    WorkflowStarter,
+    build_exception_workflow_id,
+    get_workflow_starter,
+)
 
 router = APIRouter(prefix="/exceptions", tags=["exceptions"])
 
@@ -42,6 +59,9 @@ class ExceptionCaseResponse(BaseModel):
     source_system: str
     external_reference: str | None
     raw_context_json: dict[str, Any]
+    temporal_workflow_id: str | None
+    temporal_run_id: str | None
+    workflow_lifecycle_state: WorkflowLifecycleState
     created_at: datetime
     updated_at: datetime
 
@@ -55,9 +75,10 @@ class ExceptionCaseListResponse(BaseModel):
 
 
 @router.post("", response_model=ExceptionCaseDetailResponse, status_code=status.HTTP_201_CREATED)
-def create_exception(
+async def create_exception(
     request: CreateExceptionRequest,
     session: Session = Depends(get_session),
+    workflow_starter: WorkflowStarter = Depends(get_workflow_starter),
 ) -> ExceptionCaseDetailResponse:
     exception_case, audit_history = create_exception_case(
         session,
@@ -68,6 +89,29 @@ def create_exception(
         external_reference=request.external_reference,
         raw_context_json=request.raw_context_json,
     )
+    workflow_id = build_exception_workflow_id(exception_case.case_id)
+
+    try:
+        workflow_start = await workflow_starter.start_exception_workflow(
+            exception_case.case_id,
+            workflow_id,
+        )
+        exception_case = update_exception_case_workflow(
+            session,
+            case_id=exception_case.case_id,
+            temporal_workflow_id=workflow_start.workflow_id,
+            temporal_run_id=workflow_start.run_id,
+            workflow_lifecycle_state=WorkflowLifecycleState.STARTED,
+        )
+    except WorkflowStartError:
+        exception_case = update_exception_case_workflow(
+            session,
+            case_id=exception_case.case_id,
+            temporal_workflow_id=workflow_id,
+            temporal_run_id=None,
+            workflow_lifecycle_state=WorkflowLifecycleState.START_FAILED,
+        )
+
     return _build_exception_case_detail_response(exception_case, audit_history)
 
 
@@ -97,6 +141,9 @@ def _build_exception_case_response(exception_case: ExceptionCase) -> ExceptionCa
         source_system=exception_case.source_system,
         external_reference=exception_case.external_reference,
         raw_context_json=exception_case.raw_context_json,
+        temporal_workflow_id=exception_case.temporal_workflow_id,
+        temporal_run_id=exception_case.temporal_run_id,
+        workflow_lifecycle_state=exception_case.workflow_lifecycle_state,
         created_at=exception_case.created_at,
         updated_at=exception_case.updated_at,
     )

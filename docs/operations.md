@@ -5,8 +5,7 @@
 Local development should support:
 - API startup
 - DB-backed exception persistence
-- Temporal workflow execution
-- AI provider configuration
+- Temporal workflow kickoff and worker execution
 - deterministic testing
 
 ## Expected local stack
@@ -21,9 +20,11 @@ Local development should support:
 
 ### Run app
 - start FastAPI dev server
+- `POST /exceptions` persists the case and then attempts Temporal kickoff
 
 ### Run worker
 - start Temporal worker for workflows and activities
+- current Phase 2 workflow is intentionally minimal and replay-safe
 
 ### Run tests
 - focused pytest slices
@@ -31,6 +32,17 @@ Local development should support:
 
 ### Health
 - `/health`
+
+### Workflow linkage visibility
+- `GET /exceptions`
+- `GET /exceptions/{case_id}`
+
+These endpoints expose:
+- `temporal_workflow_id`
+- `temporal_run_id`
+- `workflow_lifecycle_state`
+
+If Temporal is unavailable at create time, the case still exists and `workflow_lifecycle_state` is stored as `start_failed`.
 
 ## Operational principles
 

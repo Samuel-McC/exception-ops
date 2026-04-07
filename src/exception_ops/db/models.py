@@ -7,7 +7,13 @@ from sqlalchemy import JSON, DateTime, Enum as SqlEnum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from exception_ops.db import Base
-from exception_ops.domain.enums import AuditEventType, ExceptionStatus, ExceptionType, RiskLevel
+from exception_ops.domain.enums import (
+    AuditEventType,
+    ExceptionStatus,
+    ExceptionType,
+    RiskLevel,
+    WorkflowLifecycleState,
+)
 
 
 def utc_now() -> datetime:
@@ -34,6 +40,13 @@ class ExceptionCaseRecord(Base):
     source_system: Mapped[str] = mapped_column(String(255), nullable=False)
     external_reference: Mapped[str | None] = mapped_column(String(255))
     raw_context_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    temporal_workflow_id: Mapped[str | None] = mapped_column(String(255), unique=True)
+    temporal_run_id: Mapped[str | None] = mapped_column(String(255))
+    workflow_lifecycle_state: Mapped[WorkflowLifecycleState] = mapped_column(
+        SqlEnum(WorkflowLifecycleState, name="workflow_lifecycle_state", native_enum=False),
+        nullable=False,
+        default=WorkflowLifecycleState.NOT_STARTED,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

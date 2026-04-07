@@ -18,10 +18,11 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 - audit event on ingest
 
 ## Phase 2 — Durable workflow
-- Temporal workflow
-- worker bootstrap
-- explicit status progression
-- deterministic activity boundaries
+- Temporal workflow kickoff from exception ingest
+- stable workflow ID linkage stored on the exception case
+- run ID captured when available
+- minimal replay-safe workflow definition
+- honest `start_failed` lifecycle persistence when Temporal is unavailable
 
 ## Phase 3 — AI classification and remediation
 - provider abstraction

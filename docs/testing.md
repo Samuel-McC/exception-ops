@@ -20,14 +20,14 @@ ExceptionOps should prioritize:
 
 ### Workflow tests
 - workflow state progression
-- approval wait/signal behavior
 - retry/failure behavior
+- later, approval wait/signal behavior
 
 ### API tests
 - ingest
 - list/detail
-- approval endpoints
-- execution endpoints
+- workflow kickoff linkage
+- honest kickoff-failure behavior
 
 ### Integration tests
 - DB-backed flows
@@ -40,7 +40,5 @@ Focused tests first, full suite second.
 
 ## Regression-sensitive areas
 - workflow determinism
-- approval semantics
-- AI structured output parsing
-- execution retry behavior
+- workflow kickoff persistence
 - audit record completeness

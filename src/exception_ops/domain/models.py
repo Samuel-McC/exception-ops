@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from exception_ops.domain.enums import AuditEventType, ExceptionStatus, ExceptionType, RiskLevel
+from exception_ops.domain.enums import (
+    AuditEventType,
+    ExceptionStatus,
+    ExceptionType,
+    RiskLevel,
+    WorkflowLifecycleState,
+)
 
 
 JsonObject = dict[str, Any]
@@ -20,6 +26,9 @@ class ExceptionCase:
     source_system: str
     external_reference: str | None
     raw_context_json: JsonObject
+    temporal_workflow_id: str | None
+    temporal_run_id: str | None
+    workflow_lifecycle_state: WorkflowLifecycleState
     created_at: datetime
     updated_at: datetime
 

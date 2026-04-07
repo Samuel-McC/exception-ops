@@ -44,13 +44,17 @@ The goal is to build a production-minded automation system, not a generic chatbo
 
 ## Current status
 
-This repo is in early setup. The initial focus is:
-- repo structure
-- workflow boundaries
-- exception taxonomy
-- approval policy
-- durable orchestration shape
-- bounded AI provider design
+This repo currently implements:
+- Phase 1 exception ingestion with persistence and ingest audit records
+- Phase 2 Temporal workflow kickoff on exception creation
+- stored workflow linkage on each exception case
+- minimal replay-safe workflow coordination without AI, approvals, evidence gathering, or execution yet
+
+When `POST /exceptions` succeeds, the exception case and ingest audit record are always persisted first. The API then attempts workflow kickoff and stores one of:
+- `started`
+- `start_failed`
+
+This keeps exception ingestion durable even if Temporal is temporarily unavailable.
 
 ## Design principles
 
