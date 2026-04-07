@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any
+
+from sqlalchemy import JSON, DateTime, Enum as SqlEnum, ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from exception_ops.db import Base
+from exception_ops.domain.enums import AuditEventType, ExceptionStatus, ExceptionType, RiskLevel
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class ExceptionCaseRecord(Base):
+    __tablename__ = "exception_cases"
+
+    case_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    exception_type: Mapped[ExceptionType] = mapped_column(
+        SqlEnum(ExceptionType, name="exception_type", native_enum=False),
+        nullable=False,
+    )
+    status: Mapped[ExceptionStatus] = mapped_column(
+        SqlEnum(ExceptionStatus, name="exception_status", native_enum=False),
+        nullable=False,
+    )
+    risk_level: Mapped[RiskLevel] = mapped_column(
+        SqlEnum(RiskLevel, name="risk_level", native_enum=False),
+        nullable=False,
+    )
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    source_system: Mapped[str] = mapped_column(String(255), nullable=False)
+    external_reference: Mapped[str | None] = mapped_column(String(255))
+    raw_context_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        index=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    audit_events: Mapped[list["AuditEventRecord"]] = relationship(
+        back_populates="exception_case",
+        cascade="all, delete-orphan",
+        order_by="AuditEventRecord.created_at",
+    )
+
+
+class AuditEventRecord(Base):
+    __tablename__ = "audit_events"
+
+    event_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("exception_cases.case_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    event_type: Mapped[AuditEventType] = mapped_column(
+        SqlEnum(AuditEventType, name="audit_event_type", native_enum=False),
+        nullable=False,
+    )
+    actor: Mapped[str] = mapped_column(String(255), nullable=False)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        index=True,
+    )
+
+    exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="audit_events")

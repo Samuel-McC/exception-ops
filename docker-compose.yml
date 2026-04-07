@@ -11,6 +11,7 @@ services:
       APP_PORT: 8000
       TEMPORAL_HOST: temporal:7233
       DATABASE_URL: postgresql+psycopg://exceptionops:exceptionops@db:5432/exceptionops
+      DB_AUTO_CREATE: "true"
     ports:
       - "8000:8000"
     depends_on:

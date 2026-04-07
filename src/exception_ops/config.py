@@ -17,6 +17,7 @@ class Settings(BaseModel):
         "DATABASE_URL",
         "postgresql+psycopg://exceptionops:exceptionops@db:5432/exceptionops",
     )
+    db_auto_create: bool = _as_bool(os.getenv("DB_AUTO_CREATE", "false"), default=False)
 
     temporal_host: str = os.getenv("TEMPORAL_HOST", "temporal:7233")
     temporal_namespace: str = os.getenv("TEMPORAL_NAMESPACE", "default")
