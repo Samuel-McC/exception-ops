@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from exception_ops.domain.enums import AIRecordStatus, ExceptionType, RiskLevel, WorkflowLifecycleState
+from exception_ops.domain.enums import (
+    AIRecordStatus,
+    ExecutionAction,
+    ExceptionType,
+    RiskLevel,
+    WorkflowLifecycleState,
+)
 
 
 class ClassificationOutput(BaseModel):
@@ -14,7 +20,7 @@ class ClassificationOutput(BaseModel):
 
 
 class RemediationPlanOutput(BaseModel):
-    recommended_action: str = Field(min_length=1, max_length=255)
+    recommended_action: ExecutionAction
     operator_summary: str = Field(min_length=1, max_length=2000)
     rationale: str = Field(min_length=1, max_length=2000)
     execution_risk: RiskLevel

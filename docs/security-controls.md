@@ -29,6 +29,9 @@ Current implemented controls are still development-oriented, but they include:
 - explicit human approval state on exception cases
 - additive approval decision records before workflow signaling
 - workflow wait/signal semantics instead of ad hoc approval polling
+- explicit execution state on exception cases
+- additive execution records with request/result/failure payloads
+- bounded execution adapter allowlist with a mock-safe default
 
 ## Planned controls
 
@@ -52,6 +55,7 @@ Current implemented controls are still development-oriented, but they include:
 - no autonomous risky execution
 - explicit approval for risky actions
 - AI approval hints remain advisory only
+- AI recommended actions remain advisory only
 
 ### Workflow / execution safety
 - durable workflow history
@@ -62,7 +66,7 @@ Current implemented controls are still development-oriented, but they include:
 
 ## Honest current limitation
 
-Phase 4 approval is explicit, but it is not yet access-controlled. The approve/reject routes and operator UI should still be treated as development/internal surfaces until auth/authz lands in a later phase.
+Phase 5 approval and execution are explicit, but they are not yet access-controlled. The approve/reject routes, operator UI, and execution path should still be treated as development/internal surfaces until auth/authz lands in a later phase.
 
 ### Platform hardening
 - dockerized local environment

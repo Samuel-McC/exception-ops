@@ -6,17 +6,20 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from exception_ops.activities.approval import evaluate_approval_gate
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from exception_ops.config import settings
 from exception_ops.db.repositories import (
     create_exception_case,
     get_exception_case,
     get_latest_ai_record,
+    get_latest_execution_record,
 )
 from exception_ops.domain.enums import (
     AIRecordKind,
     AIRecordStatus,
     ApprovalState,
+    ExecutionState,
     ExceptionType,
     RiskLevel,
     WorkflowLifecycleState,
@@ -114,7 +117,7 @@ def test_ai_failures_are_persisted_without_auto_approval_or_terminal_state(
     assert refreshed_case.approval_state is ApprovalState.PENDING_POLICY
 
 
-def test_approval_gate_completes_low_risk_cases_without_waiting_for_approval(
+def test_low_risk_cases_execute_after_approval_gate_without_waiting_for_approval(
     session_factory: sessionmaker[Session],
     activity_db_overrides: None,
 ) -> None:
@@ -135,11 +138,13 @@ def test_approval_gate_completes_low_risk_cases_without_waiting_for_approval(
     asyncio.run(classify_exception(exception_case.case_id))
     asyncio.run(generate_remediation_plan(exception_case.case_id))
     approval_result = asyncio.run(evaluate_approval_gate(exception_case.case_id))
+    execution_result = asyncio.run(execute_action(exception_case.case_id))
 
     session = session_factory()
     try:
         refreshed_case = get_exception_case(session, exception_case.case_id)
         remediation = get_latest_ai_record(session, exception_case.case_id, AIRecordKind.REMEDIATION)
+        execution = get_latest_execution_record(session, exception_case.case_id)
     finally:
         session.close()
 
@@ -149,4 +154,8 @@ def test_approval_gate_completes_low_risk_cases_without_waiting_for_approval(
     assert refreshed_case is not None
     assert refreshed_case.approval_state is ApprovalState.NOT_REQUIRED
     assert refreshed_case.workflow_lifecycle_state is WorkflowLifecycleState.COMPLETED
+    assert refreshed_case.execution_state is ExecutionState.SUCCEEDED
     assert approval_result["requires_approval"] is False
+    assert execution_result["execution_state"] == "succeeded"
+    assert execution is not None
+    assert execution.action_name.value == "retry_provider_after_validation"

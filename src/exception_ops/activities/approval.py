@@ -16,6 +16,7 @@ from exception_ops.domain.enums import (
     AIRecordKind,
     AIRecordStatus,
     ApprovalState,
+    ExecutionState,
     ExceptionStatus,
     RiskLevel,
     WorkflowLifecycleState,
@@ -54,15 +55,12 @@ async def evaluate_approval_gate(case_id: str) -> dict[str, str | bool]:
         approval_state = (
             ApprovalState.PENDING if policy_result.requires_approval else ApprovalState.NOT_REQUIRED
         )
-        workflow_state = (
-            WorkflowLifecycleState.STARTED
-            if policy_result.requires_approval
-            else WorkflowLifecycleState.COMPLETED
-        )
+        workflow_state = WorkflowLifecycleState.STARTED
         update_exception_case_state(
             session,
             case_id=case_id,
             approval_state=approval_state,
+            execution_state=ExecutionState.PENDING,
             status=ExceptionStatus.IN_REVIEW,
             workflow_lifecycle_state=workflow_state,
         )

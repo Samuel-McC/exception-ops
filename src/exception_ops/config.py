@@ -27,6 +27,7 @@ class Settings(BaseModel):
     ai_provider: str = os.getenv("AI_PROVIDER", "mock")
     ai_model: str = os.getenv("AI_MODEL", "mock-heuristic-v1")
     ai_enabled: bool = _as_bool(os.getenv("AI_ENABLED", "true"), default=True)
+    execution_adapter: str = os.getenv("EXECUTION_ADAPTER", "mock")
 
     app_host: str = os.getenv("APP_HOST", "127.0.0.1")
     app_port: int = int(os.getenv("APP_PORT", "8000"))

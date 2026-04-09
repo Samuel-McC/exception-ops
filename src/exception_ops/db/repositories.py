@@ -10,7 +10,9 @@ from exception_ops.db.models import (
     AIRecordRecord,
     ApprovalDecisionRecord,
     AuditEventRecord,
+    ExecutionRecordRecord,
     ExceptionCaseRecord,
+    utc_now,
 )
 from exception_ops.domain.enums import (
     AIRecordKind,
@@ -18,12 +20,21 @@ from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
     AuditEventType,
+    ExecutionAction,
+    ExecutionRecordStatus,
+    ExecutionState,
     ExceptionStatus,
     ExceptionType,
     RiskLevel,
     WorkflowLifecycleState,
 )
-from exception_ops.domain.models import AIRecord, ApprovalDecision, AuditEvent, ExceptionCase
+from exception_ops.domain.models import (
+    AIRecord,
+    ApprovalDecision,
+    AuditEvent,
+    ExecutionRecord,
+    ExceptionCase,
+)
 
 
 INGEST_ACTOR = "system:api"
@@ -52,6 +63,7 @@ def create_exception_case(
         raw_context_json=dict(raw_context_json),
         workflow_lifecycle_state=WorkflowLifecycleState.STARTED,
         approval_state=ApprovalState.PENDING_POLICY,
+        execution_state=ExecutionState.PENDING,
     )
     audit_event = AuditEventRecord(
         event_id=str(uuid4()),
@@ -102,6 +114,7 @@ def update_exception_case_state(
     case_id: str,
     workflow_lifecycle_state: WorkflowLifecycleState | None = None,
     approval_state: ApprovalState | None = None,
+    execution_state: ExecutionState | None = None,
     status: ExceptionStatus | None = None,
 ) -> ExceptionCase:
     record = session.get(ExceptionCaseRecord, case_id)
@@ -112,6 +125,8 @@ def update_exception_case_state(
         record.workflow_lifecycle_state = workflow_lifecycle_state
     if approval_state is not None:
         record.approval_state = approval_state
+    if execution_state is not None:
+        record.execution_state = execution_state
     if status is not None:
         record.status = status
 
@@ -212,7 +227,6 @@ def apply_approval_decision(
         )
 
     case_record.approval_state = target_state
-    case_record.workflow_lifecycle_state = WorkflowLifecycleState.COMPLETED
     case_record.status = ExceptionStatus.IN_REVIEW
 
     session.add(case_record)
@@ -302,6 +316,84 @@ def list_approval_decisions(session: Session, case_id: str) -> list[ApprovalDeci
     return [_to_domain_approval_decision(record) for record in records]
 
 
+def create_execution_record(
+    session: Session,
+    *,
+    case_id: str,
+    action_name: ExecutionAction,
+    initiated_by: str,
+    status: ExecutionRecordStatus,
+    request_payload_json: dict[str, Any],
+    result_payload_json: dict[str, Any] | None = None,
+    failure_payload_json: dict[str, Any] | None = None,
+) -> ExecutionRecord:
+    record = ExecutionRecordRecord(
+        execution_id=str(uuid4()),
+        case_id=case_id,
+        action_name=action_name,
+        initiated_by=initiated_by,
+        status=status,
+        request_payload_json=dict(request_payload_json),
+        result_payload_json=dict(result_payload_json) if result_payload_json is not None else None,
+        failure_payload_json=dict(failure_payload_json) if failure_payload_json is not None else None,
+        completed_at=utc_now() if status in {ExecutionRecordStatus.SUCCEEDED, ExecutionRecordStatus.FAILED} else None,
+    )
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return _to_domain_execution_record(record)
+
+
+def update_execution_record(
+    session: Session,
+    *,
+    execution_id: str,
+    status: ExecutionRecordStatus,
+    result_payload_json: dict[str, Any] | None = None,
+    failure_payload_json: dict[str, Any] | None = None,
+) -> ExecutionRecord:
+    record = session.get(ExecutionRecordRecord, execution_id)
+    if record is None:
+        raise ValueError(f"Execution record not found: {execution_id}")
+
+    record.status = status
+    record.result_payload_json = (
+        dict(result_payload_json) if result_payload_json is not None else record.result_payload_json
+    )
+    record.failure_payload_json = (
+        dict(failure_payload_json) if failure_payload_json is not None else record.failure_payload_json
+    )
+    if status in {ExecutionRecordStatus.SUCCEEDED, ExecutionRecordStatus.FAILED}:
+        record.completed_at = utc_now()
+
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return _to_domain_execution_record(record)
+
+
+def get_latest_execution_record(session: Session, case_id: str) -> ExecutionRecord | None:
+    statement = (
+        select(ExecutionRecordRecord)
+        .where(ExecutionRecordRecord.case_id == case_id)
+        .order_by(ExecutionRecordRecord.started_at.desc())
+    )
+    record = session.scalar(statement)
+    if record is None:
+        return None
+    return _to_domain_execution_record(record)
+
+
+def list_execution_records(session: Session, case_id: str) -> list[ExecutionRecord]:
+    statement = (
+        select(ExecutionRecordRecord)
+        .where(ExecutionRecordRecord.case_id == case_id)
+        .order_by(ExecutionRecordRecord.started_at.desc())
+    )
+    records = session.scalars(statement).all()
+    return [_to_domain_execution_record(record) for record in records]
+
+
 def _to_domain_case(record: ExceptionCaseRecord) -> ExceptionCase:
     return ExceptionCase(
         case_id=record.case_id,
@@ -316,6 +408,7 @@ def _to_domain_case(record: ExceptionCaseRecord) -> ExceptionCase:
         temporal_run_id=record.temporal_run_id,
         workflow_lifecycle_state=record.workflow_lifecycle_state,
         approval_state=record.approval_state,
+        execution_state=record.execution_state,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -355,4 +448,23 @@ def _to_domain_approval_decision(record: ApprovalDecisionRecord) -> ApprovalDeci
         actor=record.actor,
         reason=record.reason,
         decided_at=record.decided_at,
+    )
+
+
+def _to_domain_execution_record(record: ExecutionRecordRecord) -> ExecutionRecord:
+    return ExecutionRecord(
+        execution_id=record.execution_id,
+        case_id=record.case_id,
+        action_name=record.action_name,
+        initiated_by=record.initiated_by,
+        status=record.status,
+        request_payload_json=dict(record.request_payload_json or {}),
+        result_payload_json=(
+            dict(record.result_payload_json) if record.result_payload_json is not None else None
+        ),
+        failure_payload_json=(
+            dict(record.failure_payload_json) if record.failure_payload_json is not None else None
+        ),
+        started_at=record.started_at,
+        completed_at=record.completed_at,
     )

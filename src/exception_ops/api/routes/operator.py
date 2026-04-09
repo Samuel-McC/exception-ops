@@ -8,13 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from exception_ops.api.routes.exceptions import (
+from exception_ops.api.exception_cases import (
     ApprovalDecisionRequest,
     ExceptionCaseDetailResponse,
-    _build_exception_case_detail_response,
-    _build_exception_case_response,
-    _load_exception_detail_or_404,
-    _submit_approval_decision,
+    build_exception_case_detail_response,
+    build_exception_case_response,
+    load_exception_case_detail_or_404,
+    submit_approval_decision,
 )
 from exception_ops.db import get_session
 from exception_ops.db.repositories import list_exception_cases
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/operator", tags=["operator"])
 
 @router.get("/exceptions", response_class=HTMLResponse)
 def operator_exceptions(session: Session = Depends(get_session)) -> HTMLResponse:
-    items = [_build_exception_case_response(item) for item in list_exception_cases(session)]
+    items = [build_exception_case_response(item) for item in list_exception_cases(session)]
     rows = "".join(
         (
             "<tr>"
@@ -35,19 +35,20 @@ def operator_exceptions(session: Session = Depends(get_session)) -> HTMLResponse
             f"<td>{escape(item.exception_type.value)}</td>"
             f"<td>{escape(item.risk_level.value)}</td>"
             f"<td>{escape(item.approval_state.value)}</td>"
+            f"<td>{escape(item.execution_state.value)}</td>"
             f"<td>{escape(item.workflow_lifecycle_state.value)}</td>"
             f"<td>{escape(item.created_at.isoformat())}</td>"
             "</tr>"
         )
         for item in items
     )
-    table_rows = rows or '<tr><td colspan="7">No exceptions found.</td></tr>'
+    table_rows = rows or '<tr><td colspan="8">No exceptions found.</td></tr>'
     body = (
         "<h1>ExceptionOps Operator View</h1>"
-        "<p>Minimal Phase 4 operator UI for approval review.</p>"
+        "<p>Minimal operator UI for approval review and bounded execution visibility.</p>"
         "<table>"
         "<thead><tr><th>Case ID</th><th>Summary</th><th>Type</th><th>Risk</th>"
-        "<th>Approval</th><th>Workflow</th><th>Created</th></tr></thead>"
+        "<th>Approval</th><th>Execution</th><th>Workflow</th><th>Created</th></tr></thead>"
         f"<tbody>{table_rows}</tbody>"
         "</table>"
     )
@@ -113,15 +114,7 @@ async def operator_reject_exception(
 
 
 def _load_operator_detail(session: Session, case_id: str) -> ExceptionCaseDetailResponse:
-    exception_case, audit_history, latest_ai_records, approval_history = _load_exception_detail_or_404(
-        session, case_id
-    )
-    return _build_exception_case_detail_response(
-        exception_case,
-        audit_history,
-        latest_ai_records,
-        approval_history,
-    )
+    return build_exception_case_detail_response(load_exception_case_detail_or_404(session, case_id))
 
 
 async def _handle_operator_decision(
@@ -134,7 +127,7 @@ async def _handle_operator_decision(
 ) -> RedirectResponse:
     form_data = await _parse_form_body(request)
     try:
-        await _submit_approval_decision(
+        await submit_approval_decision(
             session=session,
             workflow_signaler=workflow_signaler,
             case_id=case_id,
@@ -187,6 +180,7 @@ def _render_detail_page(
             f"<dt>Status</dt><dd>{escape(detail.status.value)}</dd>"
             f"<dt>Approval State</dt><dd>{escape(detail.approval_state.value)}</dd>"
             f"<dt>Approval Required</dt><dd>{_format_optional(detail.approval_required)}</dd>"
+            f"<dt>Execution State</dt><dd>{escape(detail.execution_state.value)}</dd>"
             f"<dt>Workflow State</dt><dd>{escape(detail.workflow_lifecycle_state.value)}</dd>"
             f"<dt>Workflow ID</dt><dd>{escape(detail.temporal_workflow_id or 'n/a')}</dd>"
             f"<dt>Run ID</dt><dd>{escape(detail.temporal_run_id or 'n/a')}</dd>"
@@ -201,6 +195,8 @@ def _render_detail_page(
             _render_ai_section(detail),
             "<h2>Approval History</h2>",
             _render_approval_history(detail),
+            "<h2>Execution</h2>",
+            _render_execution(detail),
             "<h2>Audit History</h2>",
             _render_audit_history(detail),
         ]
@@ -279,6 +275,33 @@ def _render_approval_history(detail: ExceptionCaseDetailResponse) -> str:
         for item in detail.approval_history
     )
     return f"<ul>{items}</ul>"
+
+
+def _render_execution(detail: ExceptionCaseDetailResponse) -> str:
+    parts = [
+        f"<p><strong>Execution State:</strong> {escape(detail.execution_state.value)}</p>",
+    ]
+    if detail.latest_execution is None:
+        parts.append("<p>No execution records recorded.</p>")
+    else:
+        parts.extend(
+            [
+                "<h3>Latest Execution</h3>",
+                _render_json_block(detail.latest_execution.model_dump()),
+            ]
+        )
+    if detail.execution_history:
+        items = "".join(
+            (
+                "<li>"
+                f"{escape(item.action_name)} by {escape(item.initiated_by)} "
+                f"with status {escape(item.status.value)} at {escape(item.started_at.isoformat())}"
+                "</li>"
+            )
+            for item in detail.execution_history
+        )
+        parts.append(f"<ul>{items}</ul>")
+    return "".join(parts)
 
 
 def _render_audit_history(detail: ExceptionCaseDetailResponse) -> str:

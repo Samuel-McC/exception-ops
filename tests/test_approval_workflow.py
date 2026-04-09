@@ -10,14 +10,22 @@ from temporalio.worker import Worker
 
 from exception_ops.activities.approval import evaluate_approval_gate, finalize_approval_decision
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from exception_ops.db.repositories import (
     create_approval_decision,
     create_exception_case,
     get_exception_case,
+    get_latest_execution_record,
     update_exception_case_workflow,
 )
-from exception_ops.domain.enums import ApprovalDecisionType, ApprovalState, ExceptionType, RiskLevel
+from exception_ops.domain.enums import (
+    ApprovalDecisionType,
+    ApprovalState,
+    ExecutionState,
+    ExceptionType,
+    RiskLevel,
+)
 from exception_ops.temporal import build_exception_workflow_id
 from exception_ops.workflows.exception_resolution import ExceptionResolutionWorkflow
 
@@ -77,6 +85,7 @@ async def test_workflow_waits_for_approval_and_completes_on_signal(
                 generate_remediation_plan,
                 evaluate_approval_gate,
                 finalize_approval_decision,
+                execute_action,
             ],
         )
         worker_task = asyncio.create_task(worker.run())
@@ -124,11 +133,16 @@ async def test_workflow_waits_for_approval_and_completes_on_signal(
     session = session_factory()
     try:
         final_case = get_exception_case(session, exception_case.case_id)
+        latest_execution = get_latest_execution_record(session, exception_case.case_id)
     finally:
         session.close()
 
     assert result["approval_state"] == "approved"
+    assert result["execution_state"] == "succeeded"
     assert result["lifecycle_state"] == "completed"
     assert final_case is not None
     assert final_case.approval_state is ApprovalState.APPROVED
+    assert final_case.execution_state is ExecutionState.SUCCEEDED
     assert final_case.workflow_lifecycle_state.value == "completed"
+    assert latest_execution is not None
+    assert latest_execution.action_name.value == "retry_provider_after_validation"

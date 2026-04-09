@@ -28,13 +28,14 @@ Initial policy:
 - the case stores an explicit `approval_state`
 - approval decisions are stored as additive records with actor, reason, and timestamp
 - the workflow waits for approval by signal when approval is required
-- approval or rejection completes the current non-executing workflow phase
+- approval or rejection completes the approval-gating phase
 
-## What approval does not do yet
+## Phase 5 execution interaction
 
-- approval does not trigger execution
-- approval does not override deterministic execution safeguards that will land later
-- AI output does not approve or reject on behalf of an operator
+- approved and `not_required` cases now continue automatically into bounded execution
+- rejected cases terminate without execution
+- execution still passes through deterministic execution policy and an allowlisted action mapping
+- AI output does not approve, reject, or directly execute on behalf of an operator
 
 ## Near-term rule
 

@@ -8,6 +8,7 @@ from exception_ops.ai.service import get_ai_service
 from exception_ops.config import settings
 from exception_ops.domain.enums import (
     ApprovalState,
+    ExecutionState,
     ExceptionStatus,
     ExceptionType,
     RiskLevel,
@@ -31,6 +32,7 @@ def _build_case() -> ExceptionCase:
         temporal_run_id="run-case-1",
         workflow_lifecycle_state=WorkflowLifecycleState.STARTED,
         approval_state=ApprovalState.PENDING_POLICY,
+        execution_state=ExecutionState.PENDING,
         created_at=now,
         updated_at=now,
     )

@@ -10,6 +10,9 @@ from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
     AuditEventType,
+    ExecutionAction,
+    ExecutionRecordStatus,
+    ExecutionState,
     ExceptionStatus,
     ExceptionType,
     RiskLevel,
@@ -34,6 +37,7 @@ class ExceptionCase:
     temporal_run_id: str | None
     workflow_lifecycle_state: WorkflowLifecycleState
     approval_state: ApprovalState
+    execution_state: ExecutionState
     created_at: datetime
     updated_at: datetime
 
@@ -78,3 +82,17 @@ class ApprovalSignal:
     decision: ApprovalDecisionType
     actor: str
     reason: str
+
+
+@dataclass(slots=True)
+class ExecutionRecord:
+    execution_id: str
+    case_id: str
+    action_name: ExecutionAction
+    initiated_by: str
+    status: ExecutionRecordStatus
+    request_payload_json: JsonObject
+    result_payload_json: JsonObject | None
+    failure_payload_json: JsonObject | None
+    started_at: datetime
+    completed_at: datetime | None

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from exception_ops.activities.approval import (
@@ -10,6 +11,7 @@ with workflow.unsafe.imports_passed_through():
         finalize_approval_decision,
     )
     from exception_ops.activities.classification import classify_exception
+    from exception_ops.activities.execution import execute_action
     from exception_ops.activities.remediation import generate_remediation_plan
 
 
@@ -46,10 +48,17 @@ class ExceptionResolutionWorkflow:
                 self._approval_decision_id,
                 start_to_close_timeout=timedelta(seconds=30),
             )
+        execution_result = await workflow.execute_activity(
+            execute_action,
+            case_id,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
 
         return {
             "case_id": case_id,
             "workflow_id": workflow.info().workflow_id,
             "approval_state": approval_result["approval_state"],
-            "lifecycle_state": approval_result["workflow_lifecycle_state"],
+            "execution_state": execution_result["execution_state"],
+            "lifecycle_state": execution_result["workflow_lifecycle_state"],
         }

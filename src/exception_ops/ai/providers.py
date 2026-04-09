@@ -7,7 +7,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from exception_ops.ai.schemas import ClassificationOutput, RemediationPlanOutput
-from exception_ops.domain.enums import ExceptionType, RiskLevel
+from exception_ops.domain.enums import ExecutionAction, ExceptionType, RiskLevel
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 MOCK_MODEL_NAME = "mock-heuristic-v1"
@@ -140,18 +140,18 @@ def _mock_remediation_payload(prompt_context: dict[str, Any]) -> dict[str, Any]:
     )
 
     action_map = {
-        ExceptionType.PAYOUT_MISMATCH.value: "review_payout_reconciliation",
-        ExceptionType.MISSING_DOCUMENT.value: "request_missing_document",
-        ExceptionType.DUPLICATE_RECORD_RISK.value: "review_duplicate_records",
-        ExceptionType.PROVIDER_FAILURE.value: "retry_provider_after_validation",
-        ExceptionType.UNKNOWN.value: "manual_triage",
+        ExceptionType.PAYOUT_MISMATCH.value: ExecutionAction.REVIEW_PAYOUT_RECONCILIATION.value,
+        ExceptionType.MISSING_DOCUMENT.value: ExecutionAction.REQUEST_MISSING_DOCUMENT.value,
+        ExceptionType.DUPLICATE_RECORD_RISK.value: ExecutionAction.REVIEW_DUPLICATE_RECORDS.value,
+        ExceptionType.PROVIDER_FAILURE.value: ExecutionAction.RETRY_PROVIDER_AFTER_VALIDATION.value,
+        ExceptionType.UNKNOWN.value: ExecutionAction.MANUAL_TRIAGE.value,
     }
     blockers = []
     if not prompt_context.get("external_reference"):
         blockers.append("external_reference_missing")
 
     return {
-        "recommended_action": action_map.get(normalized_type, "manual_triage"),
+        "recommended_action": action_map.get(normalized_type, ExecutionAction.MANUAL_TRIAGE.value),
         "operator_summary": (
             f"Mock remediation suggests operator review for {normalized_type} from "
             f"{prompt_context.get('source_system', 'unknown')}."

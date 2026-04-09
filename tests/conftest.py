@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from exception_ops.activities import approval as approval_activity
 from exception_ops.activities import classification as classification_activity
+from exception_ops.activities import execution as execution_activity
 from exception_ops.activities import remediation as remediation_activity
 from exception_ops.api.app import app
 from exception_ops.config import settings
@@ -59,11 +60,13 @@ def reset_ai_settings() -> Generator[None, None, None]:
         "ai_provider": settings.ai_provider,
         "ai_model": settings.ai_model,
         "openai_api_key": settings.openai_api_key,
+        "execution_adapter": settings.execution_adapter,
     }
     settings.ai_enabled = True
     settings.ai_provider = "mock"
     settings.ai_model = "mock-heuristic-v1"
     settings.openai_api_key = ""
+    settings.execution_adapter = "mock"
     try:
         yield
     finally:
@@ -71,6 +74,7 @@ def reset_ai_settings() -> Generator[None, None, None]:
         settings.ai_provider = original["ai_provider"]
         settings.ai_model = original["ai_model"]
         settings.openai_api_key = original["openai_api_key"]
+        settings.execution_adapter = original["execution_adapter"]
 
 
 @pytest.fixture()
@@ -107,6 +111,7 @@ def activity_db_overrides(
 ) -> None:
     monkeypatch.setattr(approval_activity, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(classification_activity, "get_session_factory", lambda: session_factory)
+    monkeypatch.setattr(execution_activity, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(remediation_activity, "get_session_factory", lambda: session_factory)
 
 

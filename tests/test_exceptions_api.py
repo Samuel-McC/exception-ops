@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from exception_ops.activities.approval import evaluate_approval_gate
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from tests.conftest import StubWorkflowSignaler, StubWorkflowStarter
 
@@ -33,6 +34,13 @@ def _prepare_pending_approval_case(case_id: str) -> None:
     asyncio.run(evaluate_approval_gate(case_id))
 
 
+def _prepare_executed_low_risk_case(case_id: str) -> None:
+    asyncio.run(classify_exception(case_id))
+    asyncio.run(generate_remediation_plan(case_id))
+    asyncio.run(evaluate_approval_gate(case_id))
+    asyncio.run(execute_action(case_id))
+
+
 def test_create_exception(client: TestClient, workflow_starter: StubWorkflowStarter) -> None:
     response = client.post("/exceptions", json=_build_payload("Provider returned 502", "payments"))
 
@@ -51,9 +59,11 @@ def test_create_exception(client: TestClient, workflow_starter: StubWorkflowStar
     assert body["workflow_lifecycle_state"] == "started"
     assert body["approval_state"] == "pending_policy"
     assert body["approval_required"] is None
+    assert body["execution_state"] == "pending"
     assert body["latest_classification"] is None
     assert body["latest_remediation"] is None
     assert body["latest_approval_decision"] is None
+    assert body["latest_execution"] is None
     assert workflow_starter.started_workflows == [(body["case_id"], body["temporal_workflow_id"])]
 
 
@@ -69,6 +79,7 @@ def test_list_exceptions_returns_newest_first(client: TestClient) -> None:
     assert body["items"][0]["temporal_workflow_id"] == second["temporal_workflow_id"]
     assert body["items"][0]["workflow_lifecycle_state"] == "started"
     assert body["items"][0]["approval_state"] == "pending_policy"
+    assert body["items"][0]["execution_state"] == "pending"
 
 
 def test_get_exception_by_id_returns_case_audit_and_approval_metadata(client: TestClient) -> None:
@@ -88,7 +99,9 @@ def test_get_exception_by_id_returns_case_audit_and_approval_metadata(client: Te
     assert body["temporal_run_id"] == created["temporal_run_id"]
     assert body["workflow_lifecycle_state"] == "started"
     assert body["approval_state"] == "pending_policy"
+    assert body["execution_state"] == "pending"
     assert body["approval_history"] == []
+    assert body["execution_history"] == []
 
 
 def test_ingest_creates_audit_record(client: TestClient) -> None:
@@ -125,6 +138,7 @@ def test_workflow_start_failure_returns_created_case_with_failed_lifecycle(
     assert body["temporal_run_id"] is None
     assert body["workflow_lifecycle_state"] == "failed"
     assert body["approval_state"] == "pending_policy"
+    assert body["execution_state"] == "pending"
     assert len(body["audit_history"]) == 1
 
     detail = client.get(f"/exceptions/{body['case_id']}")
@@ -147,6 +161,7 @@ def test_get_exception_detail_returns_ai_and_pending_approval_metadata(
     assert body["workflow_lifecycle_state"] == "started"
     assert body["approval_state"] == "pending"
     assert body["approval_required"] is True
+    assert body["execution_state"] == "pending"
     assert body["latest_classification"]["status"] == "succeeded"
     assert body["latest_classification"]["provider"] == "mock"
     assert body["latest_classification"]["output"]["normalized_exception_type"] == "provider_failure"
@@ -154,6 +169,30 @@ def test_get_exception_detail_returns_ai_and_pending_approval_metadata(
     assert body["latest_remediation"]["output"]["recommended_action"] == "retry_provider_after_validation"
     assert body["latest_remediation"]["output"]["requires_approval"] is True
     assert body["latest_approval_decision"] is None
+    assert body["latest_execution"] is None
+
+
+def test_get_exception_detail_returns_execution_metadata_after_low_risk_execution(
+    client: TestClient,
+    activity_db_overrides: None,
+) -> None:
+    created = client.post(
+        "/exceptions",
+        json=_build_payload("Provider timeout 502", "payments", risk_level="low"),
+    ).json()
+
+    _prepare_executed_low_risk_case(created["case_id"])
+
+    response = client.get(f"/exceptions/{created['case_id']}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["approval_state"] == "not_required"
+    assert body["execution_state"] == "succeeded"
+    assert body["workflow_lifecycle_state"] == "completed"
+    assert body["latest_execution"]["status"] == "succeeded"
+    assert body["latest_execution"]["action_name"] == "retry_provider_after_validation"
+    assert len(body["execution_history"]) == 1
 
 
 def test_approve_route_records_decision_and_signals_workflow(

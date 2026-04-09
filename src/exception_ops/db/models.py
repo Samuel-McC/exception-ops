@@ -13,6 +13,9 @@ from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
     AuditEventType,
+    ExecutionAction,
+    ExecutionRecordStatus,
+    ExecutionState,
     ExceptionStatus,
     ExceptionType,
     RiskLevel,
@@ -56,6 +59,11 @@ class ExceptionCaseRecord(Base):
         nullable=False,
         default=ApprovalState.PENDING_POLICY,
     )
+    execution_state: Mapped[ExecutionState] = mapped_column(
+        SqlEnum(ExecutionState, name="execution_state", native_enum=False),
+        nullable=False,
+        default=ExecutionState.PENDING,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -83,6 +91,11 @@ class ExceptionCaseRecord(Base):
         back_populates="exception_case",
         cascade="all, delete-orphan",
         order_by="ApprovalDecisionRecord.decided_at.desc()",
+    )
+    execution_records: Mapped[list["ExecutionRecordRecord"]] = relationship(
+        back_populates="exception_case",
+        cascade="all, delete-orphan",
+        order_by="ExecutionRecordRecord.started_at.desc()",
     )
 
 
@@ -168,3 +181,37 @@ class ApprovalDecisionRecord(Base):
     )
 
     exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="approval_decisions")
+
+
+class ExecutionRecordRecord(Base):
+    __tablename__ = "execution_records"
+
+    execution_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("exception_cases.case_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    action_name: Mapped[ExecutionAction] = mapped_column(
+        SqlEnum(ExecutionAction, name="execution_action", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    initiated_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[ExecutionRecordStatus] = mapped_column(
+        SqlEnum(ExecutionRecordStatus, name="execution_record_status", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    request_payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    result_payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    failure_payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        index=True,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="execution_records")

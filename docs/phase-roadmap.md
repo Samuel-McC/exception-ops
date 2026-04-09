@@ -48,6 +48,8 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 ## Phase 5 — Execution and audit
 - deterministic execution activity
 - execution attempt records
+- explicit execution state
+- bounded execution allowlist and adapter boundary
 - richer exception timeline / operator visibility
 
 ## Phase 6 — Evaluation and hardening

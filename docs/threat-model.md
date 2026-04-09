@@ -7,6 +7,7 @@ This document captures the main trust boundaries, assets, and expected threats f
 - exception cases
 - remediation plans
 - additive AI records
+- additive execution records
 - audit records
 - AI provider credentials
 - operator identity and actions
@@ -31,6 +32,7 @@ Mitigation direction:
 - authenticated operator actions later
 - role-based authorization
 - audit trail
+- bounded execution allowlist
 
 ### AI overreach
 Risk:
@@ -55,6 +57,7 @@ Mitigation direction:
 - activities are explicit
 - retries are controlled
 - execution attempts are recorded
+- execution adapters are bounded and explicit
 - later, idempotency keys where relevant
 
 ### Incomplete evidence or bad classification
@@ -96,4 +99,4 @@ At early stages, the main residual risks are:
 - insufficient operator controls
 - weak deployment defaults
 - immature evaluation of AI outputs
-- no execution yet after approval, so the full end-to-end control path is still incomplete
+- execution side effects are still mock/local-safe rather than real production integrations

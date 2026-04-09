@@ -46,6 +46,29 @@ class ApprovalDecisionType(StrEnum):
     REJECTED = "rejected"
 
 
+class ExecutionAction(StrEnum):
+    RETRY_PROVIDER_AFTER_VALIDATION = "retry_provider_after_validation"
+    REQUEST_MISSING_DOCUMENT = "request_missing_document"
+    REVIEW_DUPLICATE_RECORDS = "review_duplicate_records"
+    REVIEW_PAYOUT_RECONCILIATION = "review_payout_reconciliation"
+    MANUAL_TRIAGE = "manual_triage"
+
+
+class ExecutionState(StrEnum):
+    PENDING = "pending"
+    STARTED = "started"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class ExecutionRecordStatus(StrEnum):
+    PENDING = "pending"
+    STARTED = "started"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 class AIRecordKind(StrEnum):
     CLASSIFICATION = "classification"
     REMEDIATION = "remediation"
