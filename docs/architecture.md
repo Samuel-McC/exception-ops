@@ -30,9 +30,11 @@ These should not be changed casually:
 FastAPI provides:
 - exception ingestion
 - exception listing/detail
+- explicit approve/reject routes
+- minimal server-rendered operator pages for exception review
 - durable workflow kickoff on create
 - health endpoints
-- later, small operator/admin surfaces
+- small operator/admin surfaces
 
 ### Workflow runtime
 Temporal provides:
@@ -55,6 +57,7 @@ PostgreSQL stores:
 - workflow linkage metadata
 - audit records
 - additive AI records for classification/remediation outputs and failures
+- additive approval decision records
 
 ### AI layer
 The AI layer is bounded and provider-based:
@@ -76,19 +79,27 @@ The AI layer does not own execution authority.
 4. workflow kickoff is attempted for the case
 5. workflow linkage/state is stored on the exception record
 
-Phase 3 intentionally does not yet:
-- wait for approval
-- gather real evidence
-- execute actions
-
 ### Workflow
 1. accept `case_id`
 2. run structured AI classification activity
 3. run structured AI remediation activity
-4. persist additive AI records and coarse workflow lifecycle state
-5. return a small replay-safe lifecycle result
+4. evaluate deterministic approval policy
+5. if approval is not required, mark the case as `approval_state=not_required` and complete the current workflow phase
+6. if approval is required, mark the case as `approval_state=pending` and wait for a workflow signal
+7. after approve/reject is signaled, mark the case decision state and complete the current workflow phase
 
-Later phases will extend this with evidence gathering, approval gating, and execution.
+Approval semantics stay intentionally split:
+- `workflow_lifecycle_state` is coarse and workflow-level only: `started`, `completed`, or `failed`
+- `approval_state` represents approval coordination on the case: `pending_policy`, `not_required`, `pending`, `approved`, or `rejected`
+- `status` remains a separate case status field and is not overloaded to mean workflow or approval state
+
+Approval persistence is intentionally simple in this phase:
+- the API records the approval decision first
+- then it signals the workflow with the persisted `decision_id`
+- if signaling fails, the persisted decision remains visible and the same action can be retried to reconcile the workflow
+- the workflow completes by applying that decision idempotently
+
+Later phases will extend this with evidence gathering and execution after approval.
 
 ## Planned module map
 

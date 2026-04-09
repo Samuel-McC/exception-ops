@@ -26,6 +26,9 @@ Current implemented controls are still development-oriented, but they include:
 - mock-safe local AI default without external credentials
 - audit-style persistence for AI successes and failures
 - deterministic activity boundaries for external calls
+- explicit human approval state on exception cases
+- additive approval decision records before workflow signaling
+- workflow wait/signal semantics instead of ad hoc approval polling
 
 ## Planned controls
 
@@ -48,6 +51,7 @@ Current implemented controls are still development-oriented, but they include:
 - AI failure visibility without hidden fallback execution
 - no autonomous risky execution
 - explicit approval for risky actions
+- AI approval hints remain advisory only
 
 ### Workflow / execution safety
 - durable workflow history
@@ -55,6 +59,10 @@ Current implemented controls are still development-oriented, but they include:
 - deterministic workflow logic
 - isolated execution activities
 - audit trail for approvals and actions
+
+## Honest current limitation
+
+Phase 4 approval is explicit, but it is not yet access-controlled. The approve/reject routes and operator UI should still be treated as development/internal surfaces until auth/authz lands in a later phase.
 
 ### Platform hardening
 - dockerized local environment

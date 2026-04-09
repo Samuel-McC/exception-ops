@@ -10,9 +10,8 @@ from exception_ops.db.repositories import (
     create_ai_record,
     get_exception_case,
     get_latest_ai_record,
-    update_exception_case_workflow_state,
 )
-from exception_ops.domain.enums import AIRecordKind, AIRecordStatus, WorkflowLifecycleState
+from exception_ops.domain.enums import AIRecordKind, AIRecordStatus
 
 
 @activity.defn
@@ -52,21 +51,10 @@ async def generate_remediation_plan(case_id: str) -> dict[str, str]:
             failure_json=result.failure_json,
         )
 
-        workflow_state = (
-            WorkflowLifecycleState.COMPLETED
-            if classification_status is AIRecordStatus.SUCCEEDED and result.status is AIRecordStatus.SUCCEEDED
-            else WorkflowLifecycleState.FAILED
-        )
-        update_exception_case_workflow_state(
-            session,
-            case_id=case_id,
-            workflow_lifecycle_state=workflow_state,
-        )
-
         return {
             "case_id": case_id,
             "record_status": result.status.value,
-            "workflow_lifecycle_state": workflow_state.value,
+            "classification_record_status": classification_status.value,
         }
     finally:
         session.close()

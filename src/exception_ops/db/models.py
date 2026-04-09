@@ -10,6 +10,8 @@ from exception_ops.db import Base
 from exception_ops.domain.enums import (
     AIRecordKind,
     AIRecordStatus,
+    ApprovalDecisionType,
+    ApprovalState,
     AuditEventType,
     ExceptionStatus,
     ExceptionType,
@@ -49,6 +51,11 @@ class ExceptionCaseRecord(Base):
         nullable=False,
         default=WorkflowLifecycleState.STARTED,
     )
+    approval_state: Mapped[ApprovalState] = mapped_column(
+        SqlEnum(ApprovalState, name="approval_state", native_enum=False),
+        nullable=False,
+        default=ApprovalState.PENDING_POLICY,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -71,6 +78,11 @@ class ExceptionCaseRecord(Base):
         back_populates="exception_case",
         cascade="all, delete-orphan",
         order_by="AIRecordRecord.created_at",
+    )
+    approval_decisions: Mapped[list["ApprovalDecisionRecord"]] = relationship(
+        back_populates="exception_case",
+        cascade="all, delete-orphan",
+        order_by="ApprovalDecisionRecord.decided_at.desc()",
     )
 
 
@@ -130,3 +142,29 @@ class AIRecordRecord(Base):
     )
 
     exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="ai_records")
+
+
+class ApprovalDecisionRecord(Base):
+    __tablename__ = "approval_decisions"
+
+    decision_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("exception_cases.case_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    decision: Mapped[ApprovalDecisionType] = mapped_column(
+        SqlEnum(ApprovalDecisionType, name="approval_decision_type", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    actor: Mapped[str] = mapped_column(String(255), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        index=True,
+    )
+
+    exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="approval_decisions")

@@ -50,7 +50,8 @@ This repo currently implements:
 - stored workflow linkage on each exception case
 - Phase 3 bounded AI classification and remediation records coordinated through workflow activities
 - additive AI persistence with structured outputs, provider/model metadata, and honest failure records
-- minimal replay-safe workflow coordination without approvals, execution, or real evidence gathering yet
+- Phase 4 explicit approval gating with persisted approval decisions, workflow wait/signal behavior, and a minimal server-rendered operator UI
+- minimal replay-safe workflow coordination without execution or real evidence gathering yet
 
 When `POST /exceptions` succeeds, the exception case and ingest audit record are always persisted first. The API then attempts workflow kickoff and stores one of:
 - `started`
@@ -60,6 +61,8 @@ This keeps exception ingestion durable even if Temporal is temporarily unavailab
 
 The safe local default is `AI_PROVIDER=mock`, which produces structured classification and remediation output without requiring external credentials. The OpenAI path is opt-in and remains bounded to structured outputs only.
 
+Medium- and high-risk cases now move into an explicit approval flow. Approval decisions are persisted before workflow signaling so the operator action remains auditable even if Temporal signaling fails; if that happens, the API and operator UI return an honest error and the same approve/reject action can be retried to reconcile the workflow. Approval in this phase is still human-controlled only and does not trigger execution.
+
 ## Design principles
 
 - workflows first, not agent sprawl
@@ -68,5 +71,6 @@ The safe local default is `AI_PROVIDER=mock`, which produces structured classifi
 - AI must not autonomously approve or execute risky actions
 - AI outputs are additive records, not silent overwrites of the source exception
 - approvals remain explicit
+- approval does not yet equal execution
 - auditability is a first-class requirement
 - each phase should stay small and testable

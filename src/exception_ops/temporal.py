@@ -27,9 +27,20 @@ class WorkflowStarter(Protocol):
         ...
 
 
+class WorkflowSignaler(Protocol):
+    async def signal_approval_decision(self, workflow_id: str, decision_id: str) -> None:
+        ...
+
+
 class WorkflowStartError(Exception):
     def __init__(self, workflow_id: str) -> None:
         super().__init__(f"Unable to start workflow {workflow_id}")
+        self.workflow_id = workflow_id
+
+
+class WorkflowSignalError(Exception):
+    def __init__(self, workflow_id: str) -> None:
+        super().__init__(f"Unable to signal workflow {workflow_id}")
         self.workflow_id = workflow_id
 
 
@@ -55,5 +66,25 @@ class TemporalWorkflowStarter:
         )
 
 
+class TemporalWorkflowSignaler:
+    async def signal_approval_decision(self, workflow_id: str, decision_id: str) -> None:
+        try:
+            client = await Client.connect(
+                settings.temporal_host,
+                namespace=settings.temporal_namespace,
+            )
+            handle = client.get_workflow_handle(workflow_id)
+            await handle.signal(
+                ExceptionResolutionWorkflow.submit_approval_decision,
+                decision_id,
+            )
+        except (OSError, RPCError) as exc:
+            raise WorkflowSignalError(workflow_id) from exc
+
+
 def get_workflow_starter() -> WorkflowStarter:
     return TemporalWorkflowStarter()
+
+
+def get_workflow_signaler() -> WorkflowSignaler:
+    return TemporalWorkflowSignaler()

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from exception_ops.api.routes.exceptions import router as exceptions_router
 from exception_ops.api.routes.health import router as health_router
+from exception_ops.api.routes.operator import router as operator_router
 from exception_ops.config import settings
 from exception_ops.db import init_db
 
@@ -25,3 +26,4 @@ app = FastAPI(
 
 app.include_router(health_router)
 app.include_router(exceptions_router)
+app.include_router(operator_router)

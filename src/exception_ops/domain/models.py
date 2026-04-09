@@ -7,6 +7,8 @@ from typing import Any
 from exception_ops.domain.enums import (
     AIRecordKind,
     AIRecordStatus,
+    ApprovalDecisionType,
+    ApprovalState,
     AuditEventType,
     ExceptionStatus,
     ExceptionType,
@@ -31,6 +33,7 @@ class ExceptionCase:
     temporal_workflow_id: str | None
     temporal_run_id: str | None
     workflow_lifecycle_state: WorkflowLifecycleState
+    approval_state: ApprovalState
     created_at: datetime
     updated_at: datetime
 
@@ -57,3 +60,21 @@ class AIRecord:
     payload_json: JsonObject | None
     failure_json: JsonObject | None
     created_at: datetime
+
+
+@dataclass(slots=True)
+class ApprovalDecision:
+    decision_id: str
+    case_id: str
+    decision: ApprovalDecisionType
+    actor: str
+    reason: str
+    decided_at: datetime
+
+
+@dataclass(slots=True)
+class ApprovalSignal:
+    decision_id: str
+    decision: ApprovalDecisionType
+    actor: str
+    reason: str

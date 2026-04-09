@@ -9,13 +9,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from exception_ops.activities import approval as approval_activity
 from exception_ops.activities import classification as classification_activity
 from exception_ops.activities import remediation as remediation_activity
 from exception_ops.api.app import app
 from exception_ops.config import settings
 from exception_ops.db import Base, get_session
 from exception_ops.db import models as db_models  # noqa: F401
-from exception_ops.temporal import WorkflowStartError, WorkflowStartResult, get_workflow_starter
+from exception_ops.temporal import (
+    WorkflowSignalError,
+    WorkflowStartError,
+    WorkflowStartResult,
+    get_workflow_signaler,
+    get_workflow_starter,
+)
 
 
 @dataclass
@@ -32,6 +39,17 @@ class StubWorkflowStarter:
             workflow_id=workflow_id,
             run_id=f"run-{case_id}",
         )
+
+
+@dataclass
+class StubWorkflowSignaler:
+    should_fail: bool = False
+    signaled_workflows: list[tuple[str, str]] = field(default_factory=list)
+
+    async def signal_approval_decision(self, workflow_id: str, decision_id: str) -> None:
+        self.signaled_workflows.append((workflow_id, decision_id))
+        if self.should_fail:
+            raise WorkflowSignalError(workflow_id)
 
 
 @pytest.fixture(autouse=True)
@@ -78,10 +96,16 @@ def workflow_starter() -> StubWorkflowStarter:
 
 
 @pytest.fixture()
+def workflow_signaler() -> StubWorkflowSignaler:
+    return StubWorkflowSignaler()
+
+
+@pytest.fixture()
 def activity_db_overrides(
     monkeypatch: pytest.MonkeyPatch,
     session_factory: sessionmaker[Session],
 ) -> None:
+    monkeypatch.setattr(approval_activity, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(classification_activity, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(remediation_activity, "get_session_factory", lambda: session_factory)
 
@@ -90,6 +114,7 @@ def activity_db_overrides(
 def client(
     session_factory: sessionmaker[Session],
     workflow_starter: StubWorkflowStarter,
+    workflow_signaler: StubWorkflowSignaler,
 ) -> Generator[TestClient, None, None]:
     def override_get_session() -> Generator[Session, None, None]:
         session = session_factory()
@@ -100,6 +125,7 @@ def client(
 
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_workflow_starter] = lambda: workflow_starter
+    app.dependency_overrides[get_workflow_signaler] = lambda: workflow_signaler
 
     try:
         with TestClient(app) as test_client:

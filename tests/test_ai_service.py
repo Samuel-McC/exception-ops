@@ -6,7 +6,13 @@ from datetime import datetime, timezone
 from exception_ops.ai.schemas import ClassificationOutput
 from exception_ops.ai.service import get_ai_service
 from exception_ops.config import settings
-from exception_ops.domain.enums import ExceptionStatus, ExceptionType, RiskLevel, WorkflowLifecycleState
+from exception_ops.domain.enums import (
+    ApprovalState,
+    ExceptionStatus,
+    ExceptionType,
+    RiskLevel,
+    WorkflowLifecycleState,
+)
 from exception_ops.domain.models import ExceptionCase
 
 
@@ -24,6 +30,7 @@ def _build_case() -> ExceptionCase:
         temporal_workflow_id="exception-resolution-case-1",
         temporal_run_id="run-case-1",
         workflow_lifecycle_state=WorkflowLifecycleState.STARTED,
+        approval_state=ApprovalState.PENDING_POLICY,
         created_at=now,
         updated_at=now,
     )

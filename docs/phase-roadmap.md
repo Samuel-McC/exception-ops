@@ -35,12 +35,14 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 ## Phase 4 — Approval gate
 - approval required for medium/high-risk actions
 - explicit approval/reject actions
+- additive approval decision records
 - workflow wait/signal behavior
+- minimal operator UI for review and approval history
 
 ## Phase 5 — Execution and audit
 - deterministic execution activity
 - execution attempt records
-- exception timeline / operator visibility
+- richer exception timeline / operator visibility
 
 ## Phase 6 — Evaluation and hardening
 - regression fixtures

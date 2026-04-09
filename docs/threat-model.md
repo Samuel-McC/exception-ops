@@ -28,7 +28,7 @@ Risk:
 
 Mitigation direction:
 - explicit approval gates
-- authenticated operator actions
+- authenticated operator actions later
 - role-based authorization
 - audit trail
 
@@ -44,6 +44,7 @@ Mitigation direction:
 - AI failures are stored explicitly instead of hidden behind fallback execution
 - deterministic execution path
 - explicit approval for risky actions
+- approval policy is deterministic and based on case risk, not AI authority
 
 ### Tool-side effect misuse
 Risk:
@@ -66,7 +67,18 @@ Mitigation direction:
 - clear separation between source exception fields and additive AI records
 - clear operator visibility
 - confidence/risk fields are exposed in structured AI output
+- approval decisions are stored separately from AI suggestions
 - evaluation and test fixtures later
+
+### Approval signaling drift
+Risk:
+- an approval decision is recorded but the workflow signal does not reach Temporal
+
+Mitigation direction:
+- persist the approval decision before signaling
+- keep workflow and approval state separate on the case
+- return an honest error so the same action can be retried for reconciliation
+- keep workflow-side application of the stored decision idempotent
 
 ### Secret exposure
 Risk:
@@ -84,4 +96,4 @@ At early stages, the main residual risks are:
 - insufficient operator controls
 - weak deployment defaults
 - immature evaluation of AI outputs
-
+- no execution yet after approval, so the full end-to-end control path is still incomplete

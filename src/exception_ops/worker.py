@@ -5,6 +5,7 @@ import asyncio
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from exception_ops.activities.approval import evaluate_approval_gate, finalize_approval_decision
 from exception_ops.activities.classification import classify_exception
 from exception_ops.activities.evidence import collect_evidence
 from exception_ops.activities.execution import execute_action
@@ -27,6 +28,8 @@ async def main() -> None:
             classify_exception,
             collect_evidence,
             generate_remediation_plan,
+            evaluate_approval_gate,
+            finalize_approval_decision,
             execute_action,
         ],
     )

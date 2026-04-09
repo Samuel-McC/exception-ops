@@ -21,7 +21,7 @@ ExceptionOps should prioritize:
 ### Workflow tests
 - workflow state progression
 - retry/failure behavior
-- later, approval wait/signal behavior
+- approval wait/signal behavior
 
 ### API tests
 - ingest
@@ -29,11 +29,14 @@ ExceptionOps should prioritize:
 - workflow kickoff linkage
 - honest kickoff-failure behavior
 - detail visibility for latest AI records
+- approve/reject route behavior
+- honest approval-signal failure behavior
 
 ### Integration tests
 - DB-backed flows
 - Temporal worker/workflow path
 - mocked AI provider path
+- minimal operator UI coverage through server-rendered responses
 
 ## Testing rule
 
@@ -43,4 +46,5 @@ Focused tests first, full suite second.
 - workflow determinism
 - workflow kickoff persistence
 - AI record persistence and failure capture
+- approval decision persistence and retry/reconciliation behavior
 - audit record completeness

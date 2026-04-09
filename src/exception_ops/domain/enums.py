@@ -33,6 +33,19 @@ class WorkflowLifecycleState(StrEnum):
     FAILED = "failed"
 
 
+class ApprovalState(StrEnum):
+    PENDING_POLICY = "pending_policy"
+    NOT_REQUIRED = "not_required"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class ApprovalDecisionType(StrEnum):
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class AIRecordKind(StrEnum):
     CLASSIFICATION = "classification"
     REMEDIATION = "remediation"
