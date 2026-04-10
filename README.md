@@ -51,6 +51,7 @@ This repo currently implements:
 - Phase 3 bounded AI classification and remediation records coordinated through workflow activities
 - additive AI persistence with structured outputs, provider/model metadata, and honest failure records
 - Phase 4 explicit approval gating with persisted approval decisions, workflow wait/signal behavior, and a minimal server-rendered operator UI
+- Phase 4.5 Alembic-based schema migrations for the current persistence model
 - minimal replay-safe workflow coordination without execution or real evidence gathering yet
 
 When `POST /exceptions` succeeds, the exception case and ingest audit record are always persisted first. The API then attempts workflow kickoff and stores one of:
@@ -62,6 +63,26 @@ This keeps exception ingestion durable even if Temporal is temporarily unavailab
 The safe local default is `AI_PROVIDER=mock`, which produces structured classification and remediation output without requiring external credentials. The OpenAI path is opt-in and remains bounded to structured outputs only.
 
 Medium- and high-risk cases now move into an explicit approval flow. Approval decisions are persisted before workflow signaling so the operator action remains auditable even if Temporal signaling fails; if that happens, the API and operator UI return an honest error and the same approve/reject action can be retried to reconcile the workflow. Approval in this phase is still human-controlled only and does not trigger execution.
+
+## Database migrations
+
+Alembic is now the authoritative schema evolution path for local/dev databases. The temporary `DB_AUTO_CREATE` path still exists, but it is disabled by default and should only be used as a narrow dev/test fallback.
+
+Common commands:
+
+- create a revision:
+  - `alembic revision -m "describe change"`
+- autogenerate from SQLAlchemy metadata when appropriate:
+  - `alembic revision --autogenerate -m "describe change"`
+- upgrade the database:
+  - `alembic upgrade head`
+- run the app against a migrated database:
+  - first run `alembic upgrade head`
+  - then start the app/worker normally
+
+Honest limitation:
+- older local databases that were created through earlier ad hoc `create_all` flows may still need a reset before adopting Alembic cleanly
+- after this phase, new schema changes should go through Alembic revisions rather than bootstrap shortcuts
 
 ## Design principles
 

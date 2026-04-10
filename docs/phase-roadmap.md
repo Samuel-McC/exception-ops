@@ -39,6 +39,12 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 - workflow wait/signal behavior
 - minimal operator UI for review and approval history
 
+## Phase 4.5 — Persistence hardening
+- Alembic baseline migration for the current schema
+- migration environment and revision workflow
+- reduce reliance on startup `create_all`
+- honest local/dev migration guidance
+
 ## Phase 5 — Execution and audit
 - deterministic execution activity
 - execution attempt records

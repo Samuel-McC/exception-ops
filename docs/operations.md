@@ -5,6 +5,7 @@
 Local development should support:
 - API startup
 - DB-backed exception persistence
+- explicit DB migrations
 - Temporal workflow kickoff and worker execution
 - bounded AI classification/remediation with a safe local provider path
 - explicit approval gating and operator review
@@ -22,13 +23,27 @@ Local development should support:
 
 ### Run app
 - start FastAPI dev server
+- migrate first with `alembic upgrade head`
 - `POST /exceptions` persists the case and then attempts Temporal kickoff
 - `POST /exceptions/{case_id}/approve` and `POST /exceptions/{case_id}/reject` record operator decisions and signal the workflow
 - `GET /operator/exceptions` and `GET /operator/exceptions/{case_id}` provide a minimal server-rendered operator UI
 
 ### Run worker
 - start Temporal worker for workflows and activities
+- run after the database has been migrated with Alembic
 - current workflow runs bounded classification/remediation activities and stays replay-safe
+
+### Run migrations
+- create a blank revision:
+  - `alembic revision -m "describe change"`
+- autogenerate from metadata:
+  - `alembic revision --autogenerate -m "describe change"`
+- upgrade to latest:
+  - `alembic upgrade head`
+
+For Docker-based local work, a simple pattern is:
+- `docker compose run --rm app alembic upgrade head`
+- `docker compose up app worker`
 
 ### Run tests
 - focused pytest slices
@@ -52,6 +67,11 @@ These endpoints expose:
 If Temporal is unavailable at create time, the case still exists and `workflow_lifecycle_state` is stored as `failed`.
 
 If approval signaling fails after a decision is recorded, the API returns an honest error and the case still shows the persisted approval decision. Retry the same approve/reject action to reconcile the workflow signal path.
+
+### Schema management
+- Alembic is the authoritative schema evolution path
+- `DB_AUTO_CREATE` is disabled by default and should only be used as an explicit temporary dev/test fallback
+- older local databases created through earlier bootstrap flows may still need a reset before adopting Alembic cleanly
 
 ### AI provider modes
 - `AI_PROVIDER=mock` is the safe local default

@@ -37,6 +37,7 @@ ExceptionOps should prioritize:
 - Temporal worker/workflow path
 - mocked AI provider path
 - minimal operator UI coverage through server-rendered responses
+- Alembic upgrade wiring and startup gating checks
 
 ## Testing rule
 
@@ -47,4 +48,5 @@ Focused tests first, full suite second.
 - workflow kickoff persistence
 - AI record persistence and failure capture
 - approval decision persistence and retry/reconciliation behavior
+- migration baseline accuracy versus current SQLAlchemy metadata
 - audit record completeness

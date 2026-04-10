@@ -14,6 +14,10 @@ class Base(DeclarativeBase):
     pass
 
 
+def load_models() -> None:
+    from exception_ops.db import models  # noqa: F401
+
+
 @lru_cache(maxsize=None)
 def get_engine(database_url: str | None = None) -> Engine:
     url = database_url or settings.database_url
@@ -35,6 +39,5 @@ def get_session() -> Generator[Session, None, None]:
 
 
 def init_db(database_url: str | None = None) -> None:
-    from exception_ops.db import models  # noqa: F401
-
+    load_models()
     Base.metadata.create_all(bind=get_engine(database_url))

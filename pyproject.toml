@@ -9,6 +9,7 @@ description = "AI-assisted exception-resolution platform with durable workflows 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "alembic",
   "fastapi",
   "uvicorn",
   "pydantic",

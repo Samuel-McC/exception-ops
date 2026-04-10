@@ -59,6 +59,8 @@ PostgreSQL stores:
 - additive AI records for classification/remediation outputs and failures
 - additive approval decision records
 
+Schema evolution now runs through Alembic migrations. SQLAlchemy metadata remains the source for model definitions, but Alembic is the authoritative path for evolving existing databases.
+
 ### AI layer
 The AI layer is bounded and provider-based:
 - structured classification
@@ -98,6 +100,16 @@ Approval persistence is intentionally simple in this phase:
 - then it signals the workflow with the persisted `decision_id`
 - if signaling fails, the persisted decision remains visible and the same action can be retried to reconcile the workflow
 - the workflow completes by applying that decision idempotently
+
+## Persistence evolution
+
+The repo previously relied on a temporary `create_all` bootstrap path. Phase 4.5 introduces Alembic so the intended local/dev path is:
+- update models
+- create a revision
+- review the revision
+- run `alembic upgrade head`
+
+The `create_all` path remains available only as an explicit fallback flag for dev/test scenarios and should not be treated as the normal operational path.
 
 Later phases will extend this with evidence gathering and execution after approval.
 
