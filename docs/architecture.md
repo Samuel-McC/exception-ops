@@ -57,6 +57,7 @@ PostgreSQL stores:
 - exception cases
 - workflow linkage metadata
 - audit records
+- additive evidence records with provenance and failure metadata
 - additive AI records for classification/remediation outputs and failures
 - additive approval decision records
 - additive execution records
@@ -74,6 +75,14 @@ The AI layer is bounded and provider-based:
 
 The AI layer does not own execution authority.
 
+### Evidence layer
+The evidence layer is also bounded and adapter-based:
+- explicit allowlisted evidence adapters only
+- mock-safe local behavior by default
+- additive evidence records with raw payload, summary, provenance, status, and failure metadata
+- no open web search, crawling, or generalized tool calling
+- evidence acts as supporting context for AI and operators, not as a replacement for source case truth
+
 ## Planned request / workflow shape
 
 ### Ingest
@@ -85,12 +94,13 @@ The AI layer does not own execution authority.
 
 ### Workflow
 1. accept `case_id`
-2. run structured AI classification activity
-3. run structured AI remediation activity
-4. evaluate deterministic approval policy
-5. if approval is not required, mark the case as `approval_state=not_required` and complete the current workflow phase
-6. if approval is required, mark the case as `approval_state=pending` and wait for a workflow signal
-7. after approve/reject is signaled, mark the case decision state and complete the current workflow phase
+2. collect bounded evidence through an activity
+3. run structured AI classification activity using the source case plus collected evidence
+4. run structured AI remediation activity using the source case, collected evidence, and any classification output
+5. evaluate deterministic approval policy
+6. if approval is not required, mark the case as `approval_state=not_required` and complete the current workflow phase
+7. if approval is required, mark the case as `approval_state=pending` and wait for a workflow signal
+8. after approve/reject is signaled, mark the case decision state and complete the current workflow phase
 
 Approval semantics stay intentionally split:
 - `workflow_lifecycle_state` is coarse and workflow-level only: `started`, `completed`, or `failed`
@@ -102,6 +112,13 @@ Approval persistence is intentionally simple in this phase:
 - then it signals the workflow with the persisted `decision_id`
 - if signaling fails, the persisted decision remains visible and the same action can be retried to reconcile the workflow
 - the workflow completes by applying that decision idempotently
+
+Evidence persistence is intentionally additive:
+- each collected evidence item becomes its own record
+- raw payloads are preserved separately from human-readable summaries
+- provenance remains first-class
+- evidence collection failures are stored as failed evidence records
+- the workflow continues with partial or failed evidence rather than silently dropping the attempt
 
 ## Operator auth boundary
 
@@ -130,7 +147,7 @@ The repo previously relied on a temporary `create_all` bootstrap path. Phase 4.5
 
 The `create_all` path remains available only as an explicit fallback flag for dev/test scenarios and should not be treated as the normal operational path.
 
-Later phases will extend this with broader evidence gathering, stronger operator lifecycle management, and evaluation/hardening work.
+Later phases will extend this with broader but still bounded evidence sources, stronger operator lifecycle management, and evaluation/hardening work.
 
 ## Planned module map
 

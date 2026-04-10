@@ -13,6 +13,8 @@ from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
     AuditEventType,
+    EvidenceSourceType,
+    EvidenceStatus,
     ExecutionAction,
     ExecutionRecordStatus,
     ExecutionState,
@@ -91,6 +93,11 @@ class ExceptionCaseRecord(Base):
         back_populates="exception_case",
         cascade="all, delete-orphan",
         order_by="ApprovalDecisionRecord.decided_at.desc()",
+    )
+    evidence_records: Mapped[list["EvidenceRecordRecord"]] = relationship(
+        back_populates="exception_case",
+        cascade="all, delete-orphan",
+        order_by="EvidenceRecordRecord.collected_at.desc()",
     )
     execution_records: Mapped[list["ExecutionRecordRecord"]] = relationship(
         back_populates="exception_case",
@@ -181,6 +188,41 @@ class ApprovalDecisionRecord(Base):
     )
 
     exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="approval_decisions")
+
+
+class EvidenceRecordRecord(Base):
+    __tablename__ = "evidence_records"
+
+    evidence_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("exception_cases.case_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_type: Mapped[EvidenceSourceType] = mapped_column(
+        SqlEnum(EvidenceSourceType, name="evidence_source_type", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    source_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    adapter_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[EvidenceStatus] = mapped_column(
+        SqlEnum(EvidenceStatus, name="evidence_status", native_enum=False),
+        nullable=False,
+        index=True,
+    )
+    payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    summary_text: Mapped[str | None] = mapped_column(Text)
+    provenance_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    failure_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        index=True,
+    )
+
+    exception_case: Mapped[ExceptionCaseRecord] = relationship(back_populates="evidence_records")
 
 
 class ExecutionRecordRecord(Base):

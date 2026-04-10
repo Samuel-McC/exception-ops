@@ -59,7 +59,14 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 - CSRF protection on operator form actions
 - protected operator UI and sensitive JSON review/action routes
 
-## Phase 7 — Evaluation and hardening
+## Phase 7 — Evidence gathering and enrichment
+- bounded evidence adapters
+- additive evidence records with provenance and honest failure metadata
+- workflow evidence stage before AI
+- evidence-aware classification and remediation inputs
+- operator/detail evidence visibility
+
+## Phase 8 — Evaluation and hardening
 - regression fixtures
 - provider failure behavior
 - replay and operational polish

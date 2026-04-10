@@ -77,3 +77,17 @@ class AIRecordKind(StrEnum):
 class AIRecordStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+
+
+class EvidenceSourceType(StrEnum):
+    COLLECTION_ATTEMPT = "collection_attempt"
+    CASE_PAYLOAD_SNAPSHOT = "case_payload_snapshot"
+    PROVIDER_RESPONSE_SNAPSHOT = "provider_response_snapshot"
+    DOCUMENT_METADATA = "document_metadata"
+    INTERNAL_REFERENCE_LOOKUP = "internal_reference_lookup"
+    PRIOR_EXECUTION_SNAPSHOT = "prior_execution_snapshot"
+
+
+class EvidenceStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"

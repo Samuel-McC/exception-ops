@@ -245,6 +245,8 @@ def _render_detail_page(
             "</dl>",
             "<h2>Raw Context</h2>",
             _render_json_block(detail.raw_context_json),
+            "<h2>Collected Evidence</h2>",
+            _render_evidence(detail),
             "<h2>Approval Controls</h2>",
             _render_approval_controls(detail, operator=operator, csrf_token=csrf_token),
             "<h2>AI Metadata</h2>",
@@ -340,6 +342,35 @@ def _render_ai_record(record: dict[str, object] | None) -> str:
     if record is None:
         return "<p>Not available.</p>"
     return _render_json_block(record)
+
+
+def _render_evidence(detail: ExceptionCaseDetailResponse) -> str:
+    if not detail.evidence_history:
+        return "<p>No evidence has been collected yet.</p>"
+
+    items = []
+    for item in detail.evidence_history:
+        parts = [
+            "<li>",
+            (
+                f"<strong>{escape(item.source_type.value)}</strong> from "
+                f"{escape(item.source_name)} via {escape(item.adapter_name)} "
+                f"with status {escape(item.status.value)} at {escape(item.collected_at.isoformat())}"
+            ),
+        ]
+        if item.summary_text:
+            parts.append(f"<p>{escape(item.summary_text)}</p>")
+        parts.append("<p><strong>Provenance</strong></p>")
+        parts.append(_render_json_block(item.provenance_json))
+        if item.payload_json is not None:
+            parts.append("<p><strong>Raw Evidence</strong></p>")
+            parts.append(_render_json_block(item.payload_json))
+        if item.failure_json is not None:
+            parts.append("<p><strong>Failure</strong></p>")
+            parts.append(_render_json_block(item.failure_json))
+        parts.append("</li>")
+        items.append("".join(parts))
+    return f"<ul>{''.join(items)}</ul>"
 
 
 def _render_approval_history(detail: ExceptionCaseDetailResponse) -> str:

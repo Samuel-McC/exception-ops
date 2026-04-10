@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from exception_ops.activities.approval import evaluate_approval_gate
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.evidence import collect_evidence
 from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from tests.conftest import StubWorkflowSignaler, StubWorkflowStarter, login_as
@@ -29,12 +30,14 @@ def _build_payload(
 
 
 def _prepare_pending_approval_case(case_id: str) -> None:
+    asyncio.run(collect_evidence(case_id))
     asyncio.run(classify_exception(case_id))
     asyncio.run(generate_remediation_plan(case_id))
     asyncio.run(evaluate_approval_gate(case_id))
 
 
 def _prepare_executed_low_risk_case(case_id: str) -> None:
+    asyncio.run(collect_evidence(case_id))
     asyncio.run(classify_exception(case_id))
     asyncio.run(generate_remediation_plan(case_id))
     asyncio.run(evaluate_approval_gate(case_id))
@@ -167,6 +170,8 @@ def test_get_exception_detail_returns_ai_and_pending_approval_metadata(
     assert body["approval_state"] == "pending"
     assert body["approval_required"] is True
     assert body["execution_state"] == "pending"
+    assert len(body["evidence_history"]) >= 2
+    assert body["evidence_history"][0]["adapter_name"] == "mock"
     assert body["latest_classification"]["status"] == "succeeded"
     assert body["latest_classification"]["provider"] == "mock"
     assert body["latest_classification"]["output"]["normalized_exception_type"] == "provider_failure"
@@ -317,3 +322,30 @@ def test_get_exception_returns_404_for_missing_case(client: TestClient) -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Exception case not found"
+
+
+def test_get_exception_detail_returns_failed_evidence_history_when_collection_fails(
+    client: TestClient,
+    activity_db_overrides: None,
+) -> None:
+    created = client.post(
+        "/exceptions",
+        json={
+            **_build_payload("Provider timeout 502", "payments"),
+            "raw_context_json": {"force_evidence_failure": True},
+        },
+    ).json()
+
+    asyncio.run(collect_evidence(created["case_id"]))
+    asyncio.run(classify_exception(created["case_id"]))
+    asyncio.run(generate_remediation_plan(created["case_id"]))
+    login_as(client, "reviewer")
+
+    response = client.get(f"/exceptions/{created['case_id']}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["evidence_history"]) == 1
+    assert body["evidence_history"][0]["status"] == "failed"
+    assert body["evidence_history"][0]["source_type"] == "collection_attempt"
+    assert body["evidence_history"][0]["failure_json"]["type"] == "RuntimeError"

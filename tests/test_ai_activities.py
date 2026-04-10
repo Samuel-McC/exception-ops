@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from exception_ops.activities.approval import evaluate_approval_gate
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.evidence import collect_evidence
 from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from exception_ops.config import settings
@@ -44,6 +45,7 @@ def test_ai_activities_persist_outputs_without_auto_completing_workflow(
     finally:
         session.close()
 
+    asyncio.run(collect_evidence(exception_case.case_id))
     asyncio.run(classify_exception(exception_case.case_id))
     remediation_result = asyncio.run(generate_remediation_plan(exception_case.case_id))
 
@@ -93,6 +95,7 @@ def test_ai_failures_are_persisted_without_auto_approval_or_terminal_state(
     finally:
         session.close()
 
+    asyncio.run(collect_evidence(exception_case.case_id))
     asyncio.run(classify_exception(exception_case.case_id))
     asyncio.run(generate_remediation_plan(exception_case.case_id))
 
@@ -135,6 +138,7 @@ def test_low_risk_cases_execute_after_approval_gate_without_waiting_for_approval
     finally:
         session.close()
 
+    asyncio.run(collect_evidence(exception_case.case_id))
     asyncio.run(classify_exception(exception_case.case_id))
     asyncio.run(generate_remediation_plan(exception_case.case_id))
     approval_result = asyncio.run(evaluate_approval_gate(exception_case.case_id))

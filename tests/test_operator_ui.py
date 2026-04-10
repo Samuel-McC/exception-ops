@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from exception_ops.activities.approval import evaluate_approval_gate
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.evidence import collect_evidence
 from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from tests.conftest import extract_csrf_token, login_as
@@ -23,12 +24,14 @@ def _build_payload(summary: str, *, risk_level: str = "medium") -> dict:
 
 
 def _prepare_pending_approval_case(case_id: str) -> None:
+    asyncio.run(collect_evidence(case_id))
     asyncio.run(classify_exception(case_id))
     asyncio.run(generate_remediation_plan(case_id))
     asyncio.run(evaluate_approval_gate(case_id))
 
 
 def _prepare_executed_low_risk_case(case_id: str) -> None:
+    asyncio.run(collect_evidence(case_id))
     asyncio.run(classify_exception(case_id))
     asyncio.run(generate_remediation_plan(case_id))
     asyncio.run(evaluate_approval_gate(case_id))
@@ -63,6 +66,8 @@ def test_operator_exception_detail_renders_ai_and_approval_controls(
     assert "Approval State" in response.text
     assert "pending" in response.text
     assert "Execution State" in response.text
+    assert "Collected Evidence" in response.text
+    assert "Provenance" in response.text
     assert "retry_provider_after_validation" in response.text
     assert f'/operator/exceptions/{created["case_id"]}/approve' in response.text
     assert f'/operator/exceptions/{created["case_id"]}/reject' in response.text

@@ -10,6 +10,7 @@ from exception_ops.db.repositories import (
     create_ai_record,
     get_exception_case,
     get_latest_ai_record,
+    list_evidence_records,
 )
 from exception_ops.domain.enums import AIRecordKind, AIRecordStatus
 
@@ -38,7 +39,12 @@ async def generate_remediation_plan(case_id: str) -> dict[str, str]:
                 except ValidationError:
                     classification_status = AIRecordStatus.FAILED
 
-        result = await get_ai_service().generate_remediation_plan(exception_case, classification_output)
+        evidence_records = list(reversed(list_evidence_records(session, case_id)))
+        result = await get_ai_service().generate_remediation_plan(
+            exception_case,
+            classification_output,
+            evidence_records,
+        )
         create_ai_record(
             session,
             case_id=case_id,

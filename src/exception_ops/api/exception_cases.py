@@ -14,6 +14,7 @@ from exception_ops.db.repositories import (
     get_exception_case_detail,
     get_latest_ai_records,
     list_approval_decisions,
+    list_evidence_records,
     list_execution_records,
 )
 from exception_ops.domain.approval_policy import approval_required_from_state
@@ -23,6 +24,8 @@ from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
     AuditEventType,
+    EvidenceSourceType,
+    EvidenceStatus,
     ExecutionRecordStatus,
     ExecutionState,
     ExceptionStatus,
@@ -34,6 +37,7 @@ from exception_ops.domain.models import (
     AIRecord,
     ApprovalDecision,
     AuditEvent,
+    EvidenceRecord,
     ExecutionRecord,
     ExceptionCase,
 )
@@ -46,6 +50,7 @@ class ExceptionCaseDetailData:
     audit_history: list[AuditEvent]
     latest_ai_records: dict[AIRecordKind, AIRecord]
     approval_history: list[ApprovalDecision]
+    evidence_history: list[EvidenceRecord]
     execution_history: list[ExecutionRecord]
 
 
@@ -82,6 +87,20 @@ class ExecutionRecordResponse(BaseModel):
     failure_payload_json: dict[str, Any] | None
     started_at: datetime
     completed_at: datetime | None
+
+
+class EvidenceRecordResponse(BaseModel):
+    evidence_id: str
+    case_id: str
+    source_type: EvidenceSourceType
+    source_name: str
+    adapter_name: str
+    status: EvidenceStatus
+    payload_json: dict[str, Any] | None
+    summary_text: str | None
+    provenance_json: dict[str, Any]
+    failure_json: dict[str, Any] | None
+    collected_at: datetime
 
 
 class ClassificationRecordResponse(BaseModel):
@@ -127,6 +146,7 @@ class ExceptionCaseResponse(BaseModel):
 
 class ExceptionCaseDetailResponse(ExceptionCaseResponse):
     audit_history: list[AuditEventResponse] = Field(default_factory=list)
+    evidence_history: list[EvidenceRecordResponse] = Field(default_factory=list)
     latest_classification: ClassificationRecordResponse | None = None
     latest_remediation: RemediationRecordResponse | None = None
     latest_approval_decision: ApprovalDecisionResponse | None = None
@@ -153,6 +173,7 @@ def load_exception_case_detail(
         audit_history=audit_history,
         latest_ai_records=get_latest_ai_records(session, case_id),
         approval_history=list_approval_decisions(session, case_id),
+        evidence_history=list_evidence_records(session, case_id),
         execution_history=list_execution_records(session, case_id),
     )
 
@@ -197,6 +218,7 @@ def build_exception_case_detail_response(
     return ExceptionCaseDetailResponse(
         **build_exception_case_response(detail.exception_case).model_dump(),
         audit_history=[build_audit_event_response(event) for event in detail.audit_history],
+        evidence_history=[build_evidence_record_response(item) for item in detail.evidence_history],
         latest_classification=build_classification_record_response(
             detail.latest_ai_records.get(AIRecordKind.CLASSIFICATION)
         ),
@@ -228,6 +250,7 @@ def build_exception_case_detail_from_parts(
     audit_history: list[AuditEvent],
     latest_ai_records: dict[AIRecordKind, AIRecord],
     approval_history: list[ApprovalDecision],
+    evidence_history: list[EvidenceRecord],
     execution_history: list[ExecutionRecord],
 ) -> ExceptionCaseDetailResponse:
     return build_exception_case_detail_response(
@@ -236,6 +259,7 @@ def build_exception_case_detail_from_parts(
             audit_history=audit_history,
             latest_ai_records=latest_ai_records,
             approval_history=approval_history,
+            evidence_history=evidence_history,
             execution_history=execution_history,
         )
     )
@@ -352,6 +376,24 @@ def build_execution_record_response(
         failure_payload_json=execution_record.failure_payload_json,
         started_at=execution_record.started_at,
         completed_at=execution_record.completed_at,
+    )
+
+
+def build_evidence_record_response(
+    evidence_record: EvidenceRecord,
+) -> EvidenceRecordResponse:
+    return EvidenceRecordResponse(
+        evidence_id=evidence_record.evidence_id,
+        case_id=evidence_record.case_id,
+        source_type=evidence_record.source_type,
+        source_name=evidence_record.source_name,
+        adapter_name=evidence_record.adapter_name,
+        status=evidence_record.status,
+        payload_json=evidence_record.payload_json,
+        summary_text=evidence_record.summary_text,
+        provenance_json=evidence_record.provenance_json,
+        failure_json=evidence_record.failure_json,
+        collected_at=evidence_record.collected_at,
     )
 
 

@@ -5,6 +5,7 @@
 ExceptionOps should prioritize:
 - workflow correctness
 - explicit state transitions
+- evidence persistence and provenance
 - AI output contract validation
 - approval-gate behavior
 - auth/authz and CSRF boundaries
@@ -15,12 +16,14 @@ ExceptionOps should prioritize:
 
 ### Unit tests
 - domain logic
+- evidence adapter behavior
 - AI provider formatting/parsing
 - approval policy
 - repositories/helpers
 
 ### Workflow tests
 - workflow state progression
+- evidence collection before AI steps
 - retry/failure behavior
 - approval wait/signal behavior
 
@@ -29,6 +32,7 @@ ExceptionOps should prioritize:
 - list/detail
 - workflow kickoff linkage
 - honest kickoff-failure behavior
+- detail visibility for collected evidence
 - detail visibility for latest AI records
 - approve/reject route behavior
 - auth-required and insufficient-role behavior on protected JSON routes
@@ -37,6 +41,7 @@ ExceptionOps should prioritize:
 ### Integration tests
 - DB-backed flows
 - Temporal worker/workflow path
+- evidence persistence and honest failure capture
 - mocked AI provider path
 - minimal operator UI coverage through server-rendered responses
 - login/logout and CSRF-protected operator form coverage
@@ -49,6 +54,7 @@ Focused tests first, full suite second.
 ## Regression-sensitive areas
 - workflow determinism
 - workflow kickoff persistence
+- evidence persistence, provenance visibility, and failure capture
 - AI record persistence and failure capture
 - approval decision persistence and retry/reconciliation behavior
 - authenticated operator identity on approval decisions

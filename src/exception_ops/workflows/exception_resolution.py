@@ -11,6 +11,7 @@ with workflow.unsafe.imports_passed_through():
         finalize_approval_decision,
     )
     from exception_ops.activities.classification import classify_exception
+    from exception_ops.activities.evidence import collect_evidence
     from exception_ops.activities.execution import execute_action
     from exception_ops.activities.remediation import generate_remediation_plan
 
@@ -26,6 +27,12 @@ class ExceptionResolutionWorkflow:
 
     @workflow.run
     async def run(self, case_id: str) -> dict[str, str]:
+        await workflow.execute_activity(
+            collect_evidence,
+            case_id,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
         await workflow.execute_activity(
             classify_exception,
             case_id,

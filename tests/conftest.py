@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from exception_ops.activities import approval as approval_activity
 from exception_ops.activities import classification as classification_activity
+from exception_ops.activities import evidence as evidence_activity
 from exception_ops.activities import execution as execution_activity
 from exception_ops.activities import remediation as remediation_activity
 from exception_ops.api.app import app
@@ -100,6 +101,7 @@ def reset_ai_settings() -> Generator[None, None, None]:
         "ai_provider": settings.ai_provider,
         "ai_model": settings.ai_model,
         "openai_api_key": settings.openai_api_key,
+        "evidence_adapter": settings.evidence_adapter,
         "execution_adapter": settings.execution_adapter,
         "operator_session_secret": settings.operator_session_secret,
         "operator_session_ttl_seconds": settings.operator_session_ttl_seconds,
@@ -111,6 +113,7 @@ def reset_ai_settings() -> Generator[None, None, None]:
     settings.ai_provider = "mock"
     settings.ai_model = "mock-heuristic-v1"
     settings.openai_api_key = ""
+    settings.evidence_adapter = "mock"
     settings.execution_adapter = "mock"
     settings.operator_session_secret = "test-session-secret"
     settings.operator_session_ttl_seconds = 3600
@@ -124,6 +127,7 @@ def reset_ai_settings() -> Generator[None, None, None]:
         settings.ai_provider = original["ai_provider"]
         settings.ai_model = original["ai_model"]
         settings.openai_api_key = original["openai_api_key"]
+        settings.evidence_adapter = original["evidence_adapter"]
         settings.execution_adapter = original["execution_adapter"]
         settings.operator_session_secret = original["operator_session_secret"]
         settings.operator_session_ttl_seconds = original["operator_session_ttl_seconds"]
@@ -166,6 +170,7 @@ def activity_db_overrides(
 ) -> None:
     monkeypatch.setattr(approval_activity, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(classification_activity, "get_session_factory", lambda: session_factory)
+    monkeypatch.setattr(evidence_activity, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(execution_activity, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(remediation_activity, "get_session_factory", lambda: session_factory)
 

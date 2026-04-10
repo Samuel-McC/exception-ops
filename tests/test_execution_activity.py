@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from exception_ops.activities.approval import evaluate_approval_gate, finalize_approval_decision
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.evidence import collect_evidence
 from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from exception_ops.db.repositories import (
@@ -43,6 +44,7 @@ def test_execution_runs_for_approved_cases(
     finally:
         session.close()
 
+    asyncio.run(collect_evidence(case_id))
     asyncio.run(classify_exception(case_id))
     asyncio.run(generate_remediation_plan(case_id))
     asyncio.run(evaluate_approval_gate(case_id))
@@ -98,6 +100,7 @@ def test_execution_failure_is_persisted_honestly(
     finally:
         session.close()
 
+    asyncio.run(collect_evidence(case_id))
     asyncio.run(classify_exception(case_id))
     asyncio.run(generate_remediation_plan(case_id))
     asyncio.run(evaluate_approval_gate(case_id))
@@ -139,6 +142,7 @@ def test_rejected_cases_do_not_execute(
     finally:
         session.close()
 
+    asyncio.run(collect_evidence(case_id))
     asyncio.run(classify_exception(case_id))
     asyncio.run(generate_remediation_plan(case_id))
     asyncio.run(evaluate_approval_gate(case_id))

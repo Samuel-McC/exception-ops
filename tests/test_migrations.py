@@ -11,7 +11,7 @@ from exception_ops.api import app as app_module
 from exception_ops.config import settings
 
 
-def test_alembic_upgrade_creates_phase4_schema(tmp_path: Path, monkeypatch) -> None:
+def test_alembic_upgrade_creates_phase7_schema(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "alembic-phase4.sqlite3"
     database_url = f"sqlite+pysqlite:///{database_path}"
     monkeypatch.setattr(settings, "database_url", database_url)
@@ -28,6 +28,8 @@ def test_alembic_upgrade_creates_phase4_schema(tmp_path: Path, monkeypatch) -> N
         "audit_events",
         "ai_records",
         "approval_decisions",
+        "execution_records",
+        "evidence_records",
     }.issubset(table_names)
 
     exception_case_columns = {column["name"] for column in inspector.get_columns("exception_cases")}
@@ -39,9 +41,25 @@ def test_alembic_upgrade_creates_phase4_schema(tmp_path: Path, monkeypatch) -> N
         "temporal_workflow_id",
         "workflow_lifecycle_state",
         "approval_state",
+        "execution_state",
         "created_at",
         "updated_at",
     }.issubset(exception_case_columns)
+
+    evidence_columns = {column["name"] for column in inspector.get_columns("evidence_records")}
+    assert {
+        "evidence_id",
+        "case_id",
+        "source_type",
+        "source_name",
+        "adapter_name",
+        "status",
+        "payload_json",
+        "summary_text",
+        "provenance_json",
+        "failure_json",
+        "collected_at",
+    }.issubset(evidence_columns)
 
 
 def test_app_startup_skips_create_all_when_db_auto_create_disabled(monkeypatch) -> None:

@@ -17,10 +17,10 @@ from exception_ops.ai.providers import (
 from exception_ops.ai.schemas import ClassificationOutput, RemediationPlanOutput
 from exception_ops.config import settings
 from exception_ops.domain.enums import AIRecordStatus
-from exception_ops.domain.models import ExceptionCase
+from exception_ops.domain.models import EvidenceRecord, ExceptionCase
 
-CLASSIFICATION_PROMPT_VERSION = "classification.v1"
-REMEDIATION_PROMPT_VERSION = "remediation.v1"
+CLASSIFICATION_PROMPT_VERSION = "classification.v2"
+REMEDIATION_PROMPT_VERSION = "remediation.v2"
 
 
 @dataclass(slots=True)
@@ -34,14 +34,20 @@ class AIInvocationResult:
 
 
 class ExceptionAIService:
-    async def classify_exception(self, exception_case: ExceptionCase) -> AIInvocationResult:
-        prompt_context = _build_case_context(exception_case)
+    async def classify_exception(
+        self,
+        exception_case: ExceptionCase,
+        evidence_records: list[EvidenceRecord] | None = None,
+    ) -> AIInvocationResult:
+        prompt_context = _build_case_context(exception_case, evidence_records)
         system_prompt = (
-            "You are ExceptionOps classification. Use only the provided case data. Return a structured "
-            "classification that matches the schema exactly. Do not recommend approval or execution."
+            "You are ExceptionOps classification. Use the provided source case data as source truth and treat "
+            "collected evidence as bounded supporting context only. Return a structured classification that "
+            "matches the schema exactly. Do not recommend approval or execution."
         )
         user_prompt = (
-            "Classify this exception into the bounded taxonomy and suggest a risk level.\n\n"
+            "Classify this exception into the bounded taxonomy and suggest a risk level using the source case "
+            "data plus any collected evidence.\n\n"
             f"Prompt version: {CLASSIFICATION_PROMPT_VERSION}\n"
             f"Case context:\n{_to_json(prompt_context)}"
         )
@@ -59,18 +65,20 @@ class ExceptionAIService:
         self,
         exception_case: ExceptionCase,
         classification_output: ClassificationOutput | None,
+        evidence_records: list[EvidenceRecord] | None = None,
     ) -> AIInvocationResult:
-        prompt_context = _build_case_context(exception_case)
+        prompt_context = _build_case_context(exception_case, evidence_records)
         if classification_output is not None:
             prompt_context["classification"] = classification_output.model_dump(mode="json")
 
         system_prompt = (
             "You are ExceptionOps remediation planning. Produce an advisory remediation plan only. "
+            "Use the source case data as source truth and collected evidence as bounded supporting context. "
             "Do not approve or execute actions. Return a structured result that matches the schema exactly."
         )
         user_prompt = (
-            "Generate an operator-facing remediation plan using the stored exception context and any "
-            "available classification output.\n\n"
+            "Generate an operator-facing remediation plan using the stored exception context, any collected "
+            "evidence, and any available classification output.\n\n"
             f"Prompt version: {REMEDIATION_PROMPT_VERSION}\n"
             f"Case context:\n{_to_json(prompt_context)}"
         )
@@ -154,8 +162,11 @@ def _configured_provider_metadata() -> tuple[str, str]:
     return provider_name, settings.ai_model
 
 
-def _build_case_context(exception_case: ExceptionCase) -> dict[str, Any]:
-    return {
+def _build_case_context(
+    exception_case: ExceptionCase,
+    evidence_records: list[EvidenceRecord] | None = None,
+) -> dict[str, Any]:
+    prompt_context = {
         "case_id": exception_case.case_id,
         "exception_type": exception_case.exception_type.value,
         "risk_level": exception_case.risk_level.value,
@@ -163,6 +174,26 @@ def _build_case_context(exception_case: ExceptionCase) -> dict[str, Any]:
         "source_system": exception_case.source_system,
         "external_reference": exception_case.external_reference,
         "raw_context_json": exception_case.raw_context_json,
+    }
+    if evidence_records:
+        prompt_context["evidence"] = [_build_evidence_context(record) for record in evidence_records]
+    else:
+        prompt_context["evidence"] = []
+    return prompt_context
+
+
+def _build_evidence_context(evidence_record: EvidenceRecord) -> dict[str, Any]:
+    return {
+        "evidence_id": evidence_record.evidence_id,
+        "source_type": evidence_record.source_type.value,
+        "source_name": evidence_record.source_name,
+        "adapter_name": evidence_record.adapter_name,
+        "status": evidence_record.status.value,
+        "summary_text": evidence_record.summary_text,
+        "provenance_json": evidence_record.provenance_json,
+        "payload_json": evidence_record.payload_json,
+        "failure_json": evidence_record.failure_json,
+        "collected_at": evidence_record.collected_at.isoformat(),
     }
 
 

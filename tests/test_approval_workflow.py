@@ -10,18 +10,21 @@ from temporalio.worker import Worker
 
 from exception_ops.activities.approval import evaluate_approval_gate, finalize_approval_decision
 from exception_ops.activities.classification import classify_exception
+from exception_ops.activities.evidence import collect_evidence
 from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
 from exception_ops.db.repositories import (
     create_approval_decision,
     create_exception_case,
     get_exception_case,
+    list_evidence_records,
     get_latest_execution_record,
     update_exception_case_workflow,
 )
 from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
+    EvidenceStatus,
     ExecutionState,
     ExceptionType,
     RiskLevel,
@@ -81,6 +84,7 @@ async def test_workflow_waits_for_approval_and_completes_on_signal(
             task_queue="test-approval-task-queue",
             workflows=[ExceptionResolutionWorkflow],
             activities=[
+                collect_evidence,
                 classify_exception,
                 generate_remediation_plan,
                 evaluate_approval_gate,
@@ -133,6 +137,7 @@ async def test_workflow_waits_for_approval_and_completes_on_signal(
     session = session_factory()
     try:
         final_case = get_exception_case(session, exception_case.case_id)
+        evidence_history = list_evidence_records(session, exception_case.case_id)
         latest_execution = get_latest_execution_record(session, exception_case.case_id)
     finally:
         session.close()
@@ -144,5 +149,75 @@ async def test_workflow_waits_for_approval_and_completes_on_signal(
     assert final_case.approval_state is ApprovalState.APPROVED
     assert final_case.execution_state is ExecutionState.SUCCEEDED
     assert final_case.workflow_lifecycle_state.value == "completed"
+    assert evidence_history
+    assert any(item.status is EvidenceStatus.SUCCEEDED for item in evidence_history)
     assert latest_execution is not None
     assert latest_execution.action_name.value == "retry_provider_after_validation"
+
+
+@pytest.mark.asyncio
+async def test_workflow_continues_when_evidence_collection_fails(
+    session_factory: sessionmaker[Session],
+    activity_db_overrides: None,
+) -> None:
+    session = session_factory()
+    try:
+        exception_case, _ = create_exception_case(
+            session,
+            exception_type=ExceptionType.PROVIDER_FAILURE,
+            risk_level=RiskLevel.LOW,
+            summary="Provider returned 502 during payout processing",
+            source_system="payments",
+            external_reference="txn-124",
+            raw_context_json={"attempt": 1, "force_evidence_failure": True},
+        )
+        workflow_id = build_exception_workflow_id(exception_case.case_id)
+        update_exception_case_workflow(
+            session,
+            case_id=exception_case.case_id,
+            temporal_workflow_id=workflow_id,
+            temporal_run_id=None,
+            workflow_lifecycle_state=exception_case.workflow_lifecycle_state,
+        )
+    finally:
+        session.close()
+
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        worker = Worker(
+            env.client,
+            task_queue="test-evidence-task-queue",
+            workflows=[ExceptionResolutionWorkflow],
+            activities=[
+                collect_evidence,
+                classify_exception,
+                generate_remediation_plan,
+                evaluate_approval_gate,
+                finalize_approval_decision,
+                execute_action,
+            ],
+        )
+        worker_task = asyncio.create_task(worker.run())
+        try:
+            result = await env.client.execute_workflow(
+                ExceptionResolutionWorkflow.run,
+                exception_case.case_id,
+                id=workflow_id,
+                task_queue="test-evidence-task-queue",
+            )
+        finally:
+            worker_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await worker_task
+
+    session = session_factory()
+    try:
+        final_case = get_exception_case(session, exception_case.case_id)
+        evidence_history = list_evidence_records(session, exception_case.case_id)
+    finally:
+        session.close()
+
+    assert result["execution_state"] == "succeeded"
+    assert final_case is not None
+    assert final_case.execution_state is ExecutionState.SUCCEEDED
+    assert evidence_history
+    assert evidence_history[0].status is EvidenceStatus.FAILED

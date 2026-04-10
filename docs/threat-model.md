@@ -5,6 +5,7 @@ This document captures the main trust boundaries, assets, and expected threats f
 ## Primary assets
 
 - exception cases
+- additive evidence records
 - remediation plans
 - additive AI records
 - additive execution records
@@ -69,12 +70,26 @@ Risk:
 - misclassification leads to bad operator decisions
 
 Mitigation direction:
+- bounded evidence adapters with visible provenance
+- additive evidence records with honest failure capture
 - bounded taxonomy and structured classification schema
 - clear separation between source exception fields and additive AI records
+- clear separation between source case input and additive evidence
 - clear operator visibility
 - confidence/risk fields are exposed in structured AI output
 - approval decisions are stored separately from AI suggestions
 - evaluation and test fixtures later
+
+### Evidence provenance drift
+Risk:
+- supporting context is collected without clear source attribution
+- operators cannot tell raw evidence from summaries or failed collection attempts
+
+Mitigation direction:
+- each evidence record stores source type, source name, adapter name, collected time, and provenance metadata
+- raw evidence payloads are preserved separately from summaries
+- failed evidence attempts are stored explicitly
+- detail views expose evidence provenance directly
 
 ### Approval signaling drift
 Risk:
@@ -102,4 +117,5 @@ At early stages, the main residual risks are:
 - no password reset or delegated admin lifecycle yet
 - weak deployment defaults
 - immature evaluation of AI outputs
+- evidence sources are still bounded and mock/local-safe rather than broad production integrations
 - execution side effects are still mock/local-safe rather than real production integrations

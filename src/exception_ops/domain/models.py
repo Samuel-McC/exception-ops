@@ -10,6 +10,8 @@ from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
     AuditEventType,
+    EvidenceSourceType,
+    EvidenceStatus,
     ExecutionAction,
     ExecutionRecordStatus,
     ExecutionState,
@@ -82,6 +84,21 @@ class ApprovalSignal:
     decision: ApprovalDecisionType
     actor: str
     reason: str
+
+
+@dataclass(slots=True)
+class EvidenceRecord:
+    evidence_id: str
+    case_id: str
+    source_type: EvidenceSourceType
+    source_name: str
+    adapter_name: str
+    status: EvidenceStatus
+    payload_json: JsonObject | None
+    summary_text: str | None
+    provenance_json: JsonObject
+    failure_json: JsonObject | None
+    collected_at: datetime
 
 
 @dataclass(slots=True)

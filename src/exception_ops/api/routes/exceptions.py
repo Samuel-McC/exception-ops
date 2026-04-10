@@ -94,6 +94,7 @@ async def create_exception(
         audit_history=audit_history,
         latest_ai_records={},
         approval_history=[],
+        evidence_history=[],
         execution_history=[],
     )
 

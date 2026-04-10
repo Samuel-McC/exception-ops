@@ -35,8 +35,8 @@ The goal is to build a production-minded automation system, not a generic chatbo
 ## Planned core flow
 
 1. ingest exception
-2. classify exception
-3. gather evidence
+2. gather bounded evidence
+3. classify exception
 4. generate remediation plan
 5. require approval for risky actions
 6. execute approved actions
@@ -54,6 +54,7 @@ This repo currently implements:
 - Phase 4.5 Alembic-based schema migrations for the current persistence model
 - Phase 5 bounded execution with additive execution records, explicit execution state, and a mock-safe adapter allowlist
 - Phase 6 local/operator authentication with signed session cookies, role-based authorization, and CSRF-protected operator form actions
+- Phase 7 bounded evidence collection with additive evidence records, provenance metadata, and evidence-aware AI inputs
 
 When `POST /exceptions` succeeds, the exception case and ingest audit record are always persisted first. The API then attempts workflow kickoff and stores one of:
 - `started`
@@ -63,6 +64,18 @@ This keeps exception ingestion durable even if Temporal is temporarily unavailab
 
 The safe local default is `AI_PROVIDER=mock`, which produces structured classification and remediation output without requiring external credentials. The OpenAI path is opt-in and remains bounded to structured outputs only.
 
+The safe local default is also `EVIDENCE_ADAPTER=mock`, which collects bounded, explicit evidence records such as:
+- source case payload snapshots
+- related provider or document snapshots
+- internal reference lookups
+- prior execution snapshots when available
+
+Evidence is additive:
+- raw evidence payloads are preserved
+- summaries, provenance, and failures are stored separately
+- evidence does not overwrite source case input
+- evidence failures are persisted honestly instead of silently disappearing
+
 Medium- and high-risk cases now move into an explicit approval flow. Approval decisions are persisted before workflow signaling so the operator action remains auditable even if Temporal signaling fails; if that happens, the API and operator UI return an honest error and the same approve/reject action can be retried to reconcile the workflow.
 
 Execution remains bounded and explicit:
@@ -70,6 +83,12 @@ Execution remains bounded and explicit:
 - rejected cases stop without execution
 - execution remains deterministic and auditable
 - AI remains advisory only and does not approve or execute on its own
+
+Phase 7 places evidence before AI in the workflow:
+- the workflow collects bounded evidence first
+- classification and remediation use evidence as additional structured context
+- source case fields remain the source truth
+- evidence failures do not block reads and do not turn the system into an agentic research workflow
 
 Phase 6 adds a real operator boundary around the review/approval surface:
 - `/health` stays public
@@ -106,6 +125,7 @@ Honest limitation:
 - workflows first, not agent sprawl
 - deterministic execution remains authoritative
 - AI can classify, summarize, and recommend
+- evidence remains bounded, explicit, and provenance-first
 - AI must not autonomously approve or execute risky actions
 - AI outputs are additive records, not silent overwrites of the source exception
 - approvals remain explicit

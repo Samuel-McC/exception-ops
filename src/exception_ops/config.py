@@ -27,6 +27,7 @@ class Settings(BaseModel):
     ai_provider: str = os.getenv("AI_PROVIDER", "mock")
     ai_model: str = os.getenv("AI_MODEL", "mock-heuristic-v1")
     ai_enabled: bool = _as_bool(os.getenv("AI_ENABLED", "true"), default=True)
+    evidence_adapter: str = os.getenv("EVIDENCE_ADAPTER", "mock")
     execution_adapter: str = os.getenv("EXECUTION_ADAPTER", "mock")
 
     operator_session_secret: str = os.getenv("OPERATOR_SESSION_SECRET", "")

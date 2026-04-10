@@ -7,6 +7,7 @@ Local development should support:
 - DB-backed exception persistence
 - explicit DB migrations
 - Temporal workflow kickoff and worker execution
+- bounded evidence collection with a safe local adapter path
 - bounded AI classification/remediation with a safe local provider path
 - explicit approval gating and operator review
 - bounded execution with a safe local adapter path
@@ -27,6 +28,7 @@ Local development should support:
 - start FastAPI dev server
 - migrate first with `alembic upgrade head`
 - `POST /exceptions` persists the case and then attempts Temporal kickoff
+- the workflow now collects bounded evidence before classification/remediation
 - `POST /exceptions/{case_id}/approve` and `POST /exceptions/{case_id}/reject` record operator decisions and signal the workflow
 - `GET /operator/exceptions` and `GET /operator/exceptions/{case_id}` provide a minimal server-rendered operator UI
 - execution runs automatically in the workflow after `approved` or `not_required`
@@ -66,6 +68,7 @@ These endpoints expose:
 - `workflow_lifecycle_state`
 - `approval_state`
 - `execution_state`
+- collected evidence history with provenance and honest failure metadata on detail
 - latest approval decision and approval history on detail
 - latest classification/remediation AI metadata when available
 - latest execution record and execution history on detail
@@ -97,6 +100,11 @@ If approval signaling fails after a decision is recorded, the API returns an hon
 - `AI_PROVIDER=mock` is the safe local default
 - `AI_PROVIDER=openai` is opt-in and requires `OPENAI_API_KEY`
 
+### Evidence adapter modes
+- `EVIDENCE_ADAPTER=mock` is the safe local default
+- evidence remains bounded to allowlisted adapters only
+- this phase does not include open web search, crawling, or generalized research agents
+
 ### Execution adapter modes
 - `EXECUTION_ADAPTER=mock` is the safe local default
 - execution remains bounded to allowlisted actions only
@@ -117,12 +125,15 @@ Current auth limitations:
 
 If AI generation fails, the exception case remains available and the failure is stored as an additive AI record.
 
+If evidence collection fails, the exception case remains available and the failure is stored as an additive evidence record. The workflow continues with whatever evidence is available instead of silently dropping the attempt.
+
 If execution fails, the failure is stored as an additive execution record and the case remains visible with `execution_state=failed`.
 
 ## Operational principles
 
 - workflows should be replay-safe
 - activities should own side effects
+- evidence should remain bounded, additive, and provenance-first
 - AI should remain additive and bounded
 - approval and execution should always be inspectable
 - AI remains advisory while execution stays bounded and explicit

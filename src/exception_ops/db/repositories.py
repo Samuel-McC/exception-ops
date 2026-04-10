@@ -10,6 +10,7 @@ from exception_ops.db.models import (
     AIRecordRecord,
     ApprovalDecisionRecord,
     AuditEventRecord,
+    EvidenceRecordRecord,
     ExecutionRecordRecord,
     ExceptionCaseRecord,
     utc_now,
@@ -20,6 +21,8 @@ from exception_ops.domain.enums import (
     ApprovalDecisionType,
     ApprovalState,
     AuditEventType,
+    EvidenceSourceType,
+    EvidenceStatus,
     ExecutionAction,
     ExecutionRecordStatus,
     ExecutionState,
@@ -32,6 +35,7 @@ from exception_ops.domain.models import (
     AIRecord,
     ApprovalDecision,
     AuditEvent,
+    EvidenceRecord,
     ExecutionRecord,
     ExceptionCase,
 )
@@ -203,6 +207,37 @@ def create_approval_decision(
     return _to_domain_case(case_record), _to_domain_approval_decision(record)
 
 
+def create_evidence_record(
+    session: Session,
+    *,
+    case_id: str,
+    source_type: EvidenceSourceType,
+    source_name: str,
+    adapter_name: str,
+    status: EvidenceStatus,
+    payload_json: dict[str, Any] | None = None,
+    summary_text: str | None = None,
+    provenance_json: dict[str, Any] | None = None,
+    failure_json: dict[str, Any] | None = None,
+) -> EvidenceRecord:
+    record = EvidenceRecordRecord(
+        evidence_id=str(uuid4()),
+        case_id=case_id,
+        source_type=source_type,
+        source_name=source_name,
+        adapter_name=adapter_name,
+        status=status,
+        payload_json=dict(payload_json) if payload_json is not None else None,
+        summary_text=summary_text,
+        provenance_json=dict(provenance_json or {}),
+        failure_json=dict(failure_json) if failure_json is not None else None,
+    )
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return _to_domain_evidence_record(record)
+
+
 def apply_approval_decision(
     session: Session,
     *,
@@ -314,6 +349,16 @@ def list_approval_decisions(session: Session, case_id: str) -> list[ApprovalDeci
     )
     records = session.scalars(statement).all()
     return [_to_domain_approval_decision(record) for record in records]
+
+
+def list_evidence_records(session: Session, case_id: str) -> list[EvidenceRecord]:
+    statement = (
+        select(EvidenceRecordRecord)
+        .where(EvidenceRecordRecord.case_id == case_id)
+        .order_by(EvidenceRecordRecord.collected_at.desc())
+    )
+    records = session.scalars(statement).all()
+    return [_to_domain_evidence_record(record) for record in records]
 
 
 def create_execution_record(
@@ -448,6 +493,22 @@ def _to_domain_approval_decision(record: ApprovalDecisionRecord) -> ApprovalDeci
         actor=record.actor,
         reason=record.reason,
         decided_at=record.decided_at,
+    )
+
+
+def _to_domain_evidence_record(record: EvidenceRecordRecord) -> EvidenceRecord:
+    return EvidenceRecord(
+        evidence_id=record.evidence_id,
+        case_id=record.case_id,
+        source_type=record.source_type,
+        source_name=record.source_name,
+        adapter_name=record.adapter_name,
+        status=record.status,
+        payload_json=dict(record.payload_json) if record.payload_json is not None else None,
+        summary_text=record.summary_text,
+        provenance_json=dict(record.provenance_json or {}),
+        failure_json=dict(record.failure_json) if record.failure_json is not None else None,
+        collected_at=record.collected_at,
     )
 
 
