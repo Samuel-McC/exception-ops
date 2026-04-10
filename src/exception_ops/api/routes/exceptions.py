@@ -16,6 +16,7 @@ from exception_ops.api.exception_cases import (
     load_exception_case_detail_or_404,
     submit_approval_decision,
 )
+from exception_ops.auth import OperatorIdentity, OperatorRole, require_api_roles
 from exception_ops.db import get_session
 from exception_ops.db.repositories import create_exception_case, list_exception_cases, update_exception_case_workflow
 from exception_ops.domain.enums import ApprovalDecisionType, ExceptionType, RiskLevel, WorkflowLifecycleState
@@ -29,6 +30,16 @@ from exception_ops.temporal import (
 )
 
 router = APIRouter(prefix="/exceptions", tags=["exceptions"])
+require_review_access = require_api_roles(
+    OperatorRole.REVIEWER,
+    OperatorRole.APPROVER,
+    OperatorRole.EXECUTOR,
+    OperatorRole.ADMIN,
+)
+require_approval_access = require_api_roles(
+    OperatorRole.APPROVER,
+    OperatorRole.ADMIN,
+)
 
 
 class CreateExceptionRequest(BaseModel):
@@ -88,13 +99,20 @@ async def create_exception(
 
 
 @router.get("", response_model=ExceptionCaseListResponse)
-def get_exceptions(session: Session = Depends(get_session)) -> ExceptionCaseListResponse:
+def get_exceptions(
+    session: Session = Depends(get_session),
+    _: OperatorIdentity = Depends(require_review_access),
+) -> ExceptionCaseListResponse:
     items = [build_exception_case_response(item) for item in list_exception_cases(session)]
     return ExceptionCaseListResponse(items=items)
 
 
 @router.get("/{case_id}", response_model=ExceptionCaseDetailResponse)
-def get_exception(case_id: str, session: Session = Depends(get_session)) -> ExceptionCaseDetailResponse:
+def get_exception(
+    case_id: str,
+    session: Session = Depends(get_session),
+    _: OperatorIdentity = Depends(require_review_access),
+) -> ExceptionCaseDetailResponse:
     return build_exception_case_detail_response(load_exception_case_detail_or_404(session, case_id))
 
 
@@ -104,12 +122,14 @@ async def approve_exception(
     request: ApprovalDecisionRequest,
     session: Session = Depends(get_session),
     workflow_signaler: WorkflowSignaler = Depends(get_workflow_signaler),
+    operator: OperatorIdentity = Depends(require_approval_access),
 ) -> ExceptionCaseDetailResponse:
     return await submit_approval_decision(
         session=session,
         workflow_signaler=workflow_signaler,
         case_id=case_id,
         decision=ApprovalDecisionType.APPROVED,
+        actor=operator.username,
         request=request,
     )
 
@@ -120,11 +140,13 @@ async def reject_exception(
     request: ApprovalDecisionRequest,
     session: Session = Depends(get_session),
     workflow_signaler: WorkflowSignaler = Depends(get_workflow_signaler),
+    operator: OperatorIdentity = Depends(require_approval_access),
 ) -> ExceptionCaseDetailResponse:
     return await submit_approval_decision(
         session=session,
         workflow_signaler=workflow_signaler,
         case_id=case_id,
         decision=ApprovalDecisionType.REJECTED,
+        actor=operator.username,
         request=request,
     )

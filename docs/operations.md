@@ -10,6 +10,7 @@ Local development should support:
 - bounded AI classification/remediation with a safe local provider path
 - explicit approval gating and operator review
 - bounded execution with a safe local adapter path
+- local/operator authentication for protected review/action routes
 - deterministic testing
 
 ## Expected local stack
@@ -29,6 +30,7 @@ Local development should support:
 - `POST /exceptions/{case_id}/approve` and `POST /exceptions/{case_id}/reject` record operator decisions and signal the workflow
 - `GET /operator/exceptions` and `GET /operator/exceptions/{case_id}` provide a minimal server-rendered operator UI
 - execution runs automatically in the workflow after `approved` or `not_required`
+- `GET /operator/login` and `POST /operator/logout` provide the minimal operator auth flow
 
 ### Run worker
 - start Temporal worker for workflows and activities
@@ -68,6 +70,20 @@ These endpoints expose:
 - latest classification/remediation AI metadata when available
 - latest execution record and execution history on detail
 
+Phase 6 route boundary:
+- public:
+  - `/health`
+  - `POST /exceptions`
+- protected HTML:
+  - `/operator/exceptions`
+  - `/operator/exceptions/{case_id}`
+  - operator approve/reject form posts
+- protected JSON:
+  - `GET /exceptions`
+  - `GET /exceptions/{case_id}`
+  - `POST /exceptions/{case_id}/approve`
+  - `POST /exceptions/{case_id}/reject`
+
 If Temporal is unavailable at create time, the case still exists and `workflow_lifecycle_state` is stored as `failed`.
 
 If approval signaling fails after a decision is recorded, the API returns an honest error and the case still shows the persisted approval decision. Retry the same approve/reject action to reconcile the workflow signal path.
@@ -84,6 +100,20 @@ If approval signaling fails after a decision is recorded, the API returns an hon
 ### Execution adapter modes
 - `EXECUTION_ADAPTER=mock` is the safe local default
 - execution remains bounded to allowlisted actions only
+
+### Operator auth config
+- set `OPERATOR_SESSION_SECRET`
+- keep `OPERATOR_SECURE_COOKIES=false` only for local HTTP dev; enable it for HTTPS environments
+- configure operators through `OPERATOR_USERS_JSON` or `OPERATOR_USERS_FILE`
+- `.env.example` includes a local admin example for development only
+- operator sessions are cookie-based and time-bounded
+- operator form actions require CSRF tokens
+
+Current auth limitations:
+- local/config-backed credentials only
+- no SSO/OIDC
+- no password reset
+- no delegated admin or broader operator lifecycle tooling
 
 If AI generation fails, the exception case remains available and the failure is stored as an additive AI record.
 

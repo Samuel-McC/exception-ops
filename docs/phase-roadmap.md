@@ -52,11 +52,18 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 - bounded execution allowlist and adapter boundary
 - richer exception timeline / operator visibility
 
-## Phase 6 — Evaluation and hardening
+## Phase 6 — Operator auth and protected actions
+- local/operator authentication
+- signed session cookies with TTL
+- explicit reviewer / approver / executor / admin roles
+- CSRF protection on operator form actions
+- protected operator UI and sensitive JSON review/action routes
+
+## Phase 7 — Evaluation and hardening
 - regression fixtures
 - provider failure behavior
-- stronger security/authz
 - replay and operational polish
+- future security and deployment hardening beyond the local operator model
 
 ## Out of scope for now
 - multi-agent platforming

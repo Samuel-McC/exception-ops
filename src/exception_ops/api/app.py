@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from exception_ops.api.routes.auth import router as auth_router
 from exception_ops.api.routes.exceptions import router as exceptions_router
 from exception_ops.api.routes.health import router as health_router
 from exception_ops.api.routes.operator import router as operator_router
@@ -32,5 +33,6 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(exceptions_router)
 app.include_router(operator_router)

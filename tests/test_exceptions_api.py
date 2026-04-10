@@ -8,7 +8,7 @@ from exception_ops.activities.approval import evaluate_approval_gate
 from exception_ops.activities.classification import classify_exception
 from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
-from tests.conftest import StubWorkflowSignaler, StubWorkflowStarter
+from tests.conftest import StubWorkflowSignaler, StubWorkflowStarter, login_as
 
 
 def _build_payload(
@@ -70,6 +70,7 @@ def test_create_exception(client: TestClient, workflow_starter: StubWorkflowStar
 def test_list_exceptions_returns_newest_first(client: TestClient) -> None:
     first = client.post("/exceptions", json=_build_payload("First exception", "payments")).json()
     second = client.post("/exceptions", json=_build_payload("Second exception", "ledger")).json()
+    login_as(client, "reviewer")
 
     response = client.get("/exceptions")
 
@@ -87,6 +88,7 @@ def test_get_exception_by_id_returns_case_audit_and_approval_metadata(client: Te
         "/exceptions",
         json=_build_payload("Missing statement", "documents", external_reference="doc-99"),
     ).json()
+    login_as(client, "reviewer")
 
     response = client.get(f"/exceptions/{created['case_id']}")
 
@@ -109,6 +111,7 @@ def test_ingest_creates_audit_record(client: TestClient) -> None:
         "/exceptions",
         json=_build_payload("Payout mismatch", "reconciliation", external_reference="txn-42"),
     ).json()
+    login_as(client, "reviewer")
 
     detail = client.get(f"/exceptions/{created['case_id']}")
 
@@ -141,6 +144,7 @@ def test_workflow_start_failure_returns_created_case_with_failed_lifecycle(
     assert body["execution_state"] == "pending"
     assert len(body["audit_history"]) == 1
 
+    login_as(client, "reviewer")
     detail = client.get(f"/exceptions/{body['case_id']}")
     assert detail.status_code == 200
     assert detail.json()["workflow_lifecycle_state"] == "failed"
@@ -153,6 +157,7 @@ def test_get_exception_detail_returns_ai_and_pending_approval_metadata(
     created = client.post("/exceptions", json=_build_payload("Provider timeout 502", "payments")).json()
 
     _prepare_pending_approval_case(created["case_id"])
+    login_as(client, "reviewer")
 
     response = client.get(f"/exceptions/{created['case_id']}")
 
@@ -182,6 +187,7 @@ def test_get_exception_detail_returns_execution_metadata_after_low_risk_executio
     ).json()
 
     _prepare_executed_low_risk_case(created["case_id"])
+    login_as(client, "reviewer")
 
     response = client.get(f"/exceptions/{created['case_id']}")
 
@@ -202,10 +208,11 @@ def test_approve_route_records_decision_and_signals_workflow(
 ) -> None:
     created = client.post("/exceptions", json=_build_payload("Provider timeout 502", "payments")).json()
     _prepare_pending_approval_case(created["case_id"])
+    login_as(client, "approver")
 
     response = client.post(
         f"/exceptions/{created['case_id']}/approve",
-        json={"actor": "operator:alice", "reason": "Verified the provider retry plan."},
+        json={"reason": "Verified the provider retry plan."},
     )
 
     assert response.status_code == 200
@@ -213,7 +220,7 @@ def test_approve_route_records_decision_and_signals_workflow(
     assert body["approval_state"] == "approved"
     assert body["workflow_lifecycle_state"] == "started"
     assert body["latest_approval_decision"]["decision"] == "approved"
-    assert body["latest_approval_decision"]["actor"] == "operator:alice"
+    assert body["latest_approval_decision"]["actor"] == "approver"
     assert len(body["approval_history"]) == 1
     assert workflow_signaler.signaled_workflows == [
         (created["temporal_workflow_id"], body["latest_approval_decision"]["decision_id"])
@@ -227,17 +234,18 @@ def test_reject_route_records_decision_and_signals_workflow(
 ) -> None:
     created = client.post("/exceptions", json=_build_payload("Provider timeout 502", "payments")).json()
     _prepare_pending_approval_case(created["case_id"])
+    login_as(client, "approver")
 
     response = client.post(
         f"/exceptions/{created['case_id']}/reject",
-        json={"actor": "operator:bob", "reason": "Need manual investigation before any action."},
+        json={"reason": "Need manual investigation before any action."},
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["approval_state"] == "rejected"
     assert body["latest_approval_decision"]["decision"] == "rejected"
-    assert body["latest_approval_decision"]["actor"] == "operator:bob"
+    assert body["latest_approval_decision"]["actor"] == "approver"
     assert len(body["approval_history"]) == 1
     assert workflow_signaler.signaled_workflows == [
         (created["temporal_workflow_id"], body["latest_approval_decision"]["decision_id"])
@@ -251,19 +259,24 @@ def test_approve_route_allows_retry_when_signal_failed(
 ) -> None:
     created = client.post("/exceptions", json=_build_payload("Provider timeout 502", "payments")).json()
     _prepare_pending_approval_case(created["case_id"])
+    login_as(client, "approver")
     workflow_signaler.should_fail = True
 
     first = client.post(
         f"/exceptions/{created['case_id']}/approve",
-        json={"actor": "operator:alice", "reason": "Initial approval attempt."},
+        json={"reason": "Initial approval attempt."},
     )
 
     assert first.status_code == 502
+    client.cookies.clear()
+    login_as(client, "reviewer")
     detail = client.get(f"/exceptions/{created['case_id']}").json()
     decision_id = detail["latest_approval_decision"]["decision_id"]
     assert detail["approval_state"] == "approved"
     assert detail["workflow_lifecycle_state"] == "started"
 
+    client.cookies.clear()
+    login_as(client, "approver")
     workflow_signaler.should_fail = False
     second = client.post(
         f"/exceptions/{created['case_id']}/approve",
@@ -287,10 +300,11 @@ def test_invalid_state_approval_attempt_fails_cleanly(
     asyncio.run(classify_exception(created["case_id"]))
     asyncio.run(generate_remediation_plan(created["case_id"]))
     asyncio.run(evaluate_approval_gate(created["case_id"]))
+    login_as(client, "approver")
 
     response = client.post(
         f"/exceptions/{created['case_id']}/approve",
-        json={"actor": "operator:alice", "reason": "Should not be needed."},
+        json={"reason": "Should not be needed."},
     )
 
     assert response.status_code == 409
@@ -298,6 +312,7 @@ def test_invalid_state_approval_attempt_fails_cleanly(
 
 
 def test_get_exception_returns_404_for_missing_case(client: TestClient) -> None:
+    login_as(client, "reviewer")
     response = client.get("/exceptions/missing-case")
 
     assert response.status_code == 404

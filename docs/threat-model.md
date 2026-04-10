@@ -29,7 +29,10 @@ Risk:
 
 Mitigation direction:
 - explicit approval gates
-- authenticated operator actions later
+- authenticated operator actions
+- signed operator sessions
+- explicit role checks on sensitive review/action routes
+- CSRF protection on browser form actions
 - role-based authorization
 - audit trail
 - bounded execution allowlist
@@ -95,8 +98,8 @@ Mitigation direction:
 ## Residual risk at early stage
 
 At early stages, the main residual risks are:
-- incomplete auth/authz
-- insufficient operator controls
+- local-only auth model without SSO/OIDC
+- no password reset or delegated admin lifecycle yet
 - weak deployment defaults
 - immature evaluation of AI outputs
 - execution side effects are still mock/local-safe rather than real production integrations

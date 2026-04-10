@@ -29,6 +29,15 @@ class Settings(BaseModel):
     ai_enabled: bool = _as_bool(os.getenv("AI_ENABLED", "true"), default=True)
     execution_adapter: str = os.getenv("EXECUTION_ADAPTER", "mock")
 
+    operator_session_secret: str = os.getenv("OPERATOR_SESSION_SECRET", "")
+    operator_session_ttl_seconds: int = int(os.getenv("OPERATOR_SESSION_TTL_SECONDS", "28800"))
+    operator_secure_cookies: bool = _as_bool(
+        os.getenv("OPERATOR_SECURE_COOKIES", "false"),
+        default=False,
+    )
+    operator_users_json: str = os.getenv("OPERATOR_USERS_JSON", "")
+    operator_users_file: str = os.getenv("OPERATOR_USERS_FILE", "")
+
     app_host: str = os.getenv("APP_HOST", "127.0.0.1")
     app_port: int = int(os.getenv("APP_PORT", "8000"))
 

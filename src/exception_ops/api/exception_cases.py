@@ -50,7 +50,6 @@ class ExceptionCaseDetailData:
 
 
 class ApprovalDecisionRequest(BaseModel):
-    actor: str | None = Field(default=None, max_length=255)
     reason: str | None = Field(default=None, max_length=2000)
 
 
@@ -248,6 +247,7 @@ async def submit_approval_decision(
     workflow_signaler: WorkflowSignaler,
     case_id: str,
     decision: ApprovalDecisionType,
+    actor: str,
     request: ApprovalDecisionRequest,
 ) -> ExceptionCaseDetailResponse:
     detail = load_exception_case_detail_or_404(session, case_id)
@@ -281,12 +281,12 @@ async def submit_approval_decision(
                 detail="Exception case is not waiting for approval",
             )
 
-        actor = (request.actor or "").strip()
+        actor = actor.strip()
         reason = (request.reason or "").strip()
         if not actor or not reason:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="actor and reason are required when recording a new approval decision",
+                detail="Authenticated operator identity and reason are required when recording a new approval decision",
             )
 
         _, decision_record = create_approval_decision(

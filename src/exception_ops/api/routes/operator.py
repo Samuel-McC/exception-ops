@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from html import escape
 from json import dumps
-from urllib.parse import parse_qs, quote
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
+from exception_ops.api.forms import parse_form_body
 from exception_ops.api.exception_cases import (
     ApprovalDecisionRequest,
     ExceptionCaseDetailResponse,
@@ -16,16 +17,42 @@ from exception_ops.api.exception_cases import (
     load_exception_case_detail_or_404,
     submit_approval_decision,
 )
+from exception_ops.api.operator_ui import render_page
+from exception_ops.auth import (
+    OperatorIdentity,
+    OperatorRole,
+    build_operator_login_redirect,
+    get_operator_page_context,
+    validate_session_csrf,
+)
 from exception_ops.db import get_session
 from exception_ops.db.repositories import list_exception_cases
 from exception_ops.domain.enums import ApprovalDecisionType, ApprovalState, WorkflowLifecycleState
 from exception_ops.temporal import WorkflowSignaler, get_workflow_signaler
 
 router = APIRouter(prefix="/operator", tags=["operator"])
+REVIEW_ROLES = (
+    OperatorRole.REVIEWER,
+    OperatorRole.APPROVER,
+    OperatorRole.EXECUTOR,
+    OperatorRole.ADMIN,
+)
+APPROVAL_ROLES = (
+    OperatorRole.APPROVER,
+    OperatorRole.ADMIN,
+)
 
 
 @router.get("/exceptions", response_class=HTMLResponse)
-def operator_exceptions(session: Session = Depends(get_session)) -> HTMLResponse:
+def operator_exceptions(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    page_context = _get_operator_page_context(request, *REVIEW_ROLES)
+    if isinstance(page_context, RedirectResponse):
+        return page_context
+
+    operator, csrf_token = page_context
     items = [build_exception_case_response(item) for item in list_exception_cases(session)]
     rows = "".join(
         (
@@ -52,7 +79,7 @@ def operator_exceptions(session: Session = Depends(get_session)) -> HTMLResponse
         f"<tbody>{table_rows}</tbody>"
         "</table>"
     )
-    return HTMLResponse(_page("Exceptions", body))
+    return HTMLResponse(render_page("Exceptions", body, operator=operator, csrf_token=csrf_token))
 
 
 @router.get("/exceptions/{case_id}", response_class=HTMLResponse)
@@ -60,25 +87,39 @@ def operator_exception_detail(
     case_id: str,
     request: Request,
     session: Session = Depends(get_session),
-) -> HTMLResponse:
+) -> Response:
+    page_context = _get_operator_page_context(request, *REVIEW_ROLES)
+    if isinstance(page_context, RedirectResponse):
+        return page_context
+
+    operator, csrf_token = page_context
     try:
         detail = _load_operator_detail(session, case_id)
     except HTTPException as exc:
         return HTMLResponse(
-            _page(
+            render_page(
                 "Case Not Found",
                 (
                     f"<h1>Case {escape(case_id)}</h1>"
                     f"<p>{escape(str(exc.detail))}</p>"
                     '<p><a href="/operator/exceptions">Back to exceptions</a></p>'
                 ),
+                operator=operator,
+                csrf_token=csrf_token,
             ),
             status_code=exc.status_code,
         )
 
     message = request.query_params.get("message")
     error = request.query_params.get("error")
-    return HTMLResponse(_page(f"Case {case_id}", _render_detail_page(detail, message, error)))
+    return HTMLResponse(
+        render_page(
+            f"Case {case_id}",
+            _render_detail_page(detail, message, error, operator=operator, csrf_token=csrf_token),
+            operator=operator,
+            csrf_token=csrf_token,
+        )
+    )
 
 
 @router.post("/exceptions/{case_id}/approve")
@@ -87,7 +128,7 @@ async def operator_approve_exception(
     request: Request,
     session: Session = Depends(get_session),
     workflow_signaler: WorkflowSignaler = Depends(get_workflow_signaler),
-) -> RedirectResponse:
+) -> Response:
     return await _handle_operator_decision(
         case_id=case_id,
         decision=ApprovalDecisionType.APPROVED,
@@ -103,7 +144,7 @@ async def operator_reject_exception(
     request: Request,
     session: Session = Depends(get_session),
     workflow_signaler: WorkflowSignaler = Depends(get_workflow_signaler),
-) -> RedirectResponse:
+) -> Response:
     return await _handle_operator_decision(
         case_id=case_id,
         decision=ApprovalDecisionType.REJECTED,
@@ -124,16 +165,34 @@ async def _handle_operator_decision(
     request: Request,
     session: Session,
     workflow_signaler: WorkflowSignaler,
-) -> RedirectResponse:
-    form_data = await _parse_form_body(request)
+) -> Response:
+    page_context = _get_operator_page_context(request, *APPROVAL_ROLES)
+    if isinstance(page_context, RedirectResponse):
+        return page_context
+
+    operator, csrf_token = page_context
+    form_data = await parse_form_body(request)
+    try:
+        validate_session_csrf(form_data.get("csrf_token"), csrf_token)
+    except HTTPException:
+        return HTMLResponse(
+            render_page(
+                "Forbidden",
+                "<h1>Forbidden</h1><p>invalid_csrf_token</p>",
+                operator=operator,
+                csrf_token=csrf_token,
+            ),
+            status_code=403,
+        )
+
     try:
         await submit_approval_decision(
             session=session,
             workflow_signaler=workflow_signaler,
             case_id=case_id,
             decision=decision,
+            actor=operator.username,
             request=ApprovalDecisionRequest(
-                actor=form_data.get("actor"),
                 reason=form_data.get("reason"),
             ),
         )
@@ -150,16 +209,13 @@ async def _handle_operator_decision(
     )
 
 
-async def _parse_form_body(request: Request) -> dict[str, str]:
-    body = (await request.body()).decode()
-    parsed = parse_qs(body, keep_blank_values=True)
-    return {key: values[0] for key, values in parsed.items() if values}
-
-
 def _render_detail_page(
     detail: ExceptionCaseDetailResponse,
     message: str | None,
     error: str | None,
+    *,
+    operator: OperatorIdentity,
+    csrf_token: str,
 ) -> str:
     sections = [
         f"<h1>Exception {escape(detail.case_id)}</h1>",
@@ -190,7 +246,7 @@ def _render_detail_page(
             "<h2>Raw Context</h2>",
             _render_json_block(detail.raw_context_json),
             "<h2>Approval Controls</h2>",
-            _render_approval_controls(detail),
+            _render_approval_controls(detail, operator=operator, csrf_token=csrf_token),
             "<h2>AI Metadata</h2>",
             _render_ai_section(detail),
             "<h2>Approval History</h2>",
@@ -204,11 +260,29 @@ def _render_detail_page(
     return "".join(sections)
 
 
-def _render_approval_controls(detail: ExceptionCaseDetailResponse) -> str:
+def _render_approval_controls(
+    detail: ExceptionCaseDetailResponse,
+    *,
+    operator: OperatorIdentity,
+    csrf_token: str,
+) -> str:
+    if not operator.has_any_role(*APPROVAL_ROLES):
+        return "<p>Approval actions are unavailable for your role.</p>"
+
     if detail.approval_state is ApprovalState.PENDING:
         return (
-            _approval_form(detail.case_id, ApprovalDecisionType.APPROVED, "Approve case")
-            + _approval_form(detail.case_id, ApprovalDecisionType.REJECTED, "Reject case")
+            _approval_form(
+                detail.case_id,
+                ApprovalDecisionType.APPROVED,
+                "Approve case",
+                csrf_token=csrf_token,
+            )
+            + _approval_form(
+                detail.case_id,
+                ApprovalDecisionType.REJECTED,
+                "Reject case",
+                csrf_token=csrf_token,
+            )
         )
 
     if (
@@ -218,7 +292,13 @@ def _render_approval_controls(detail: ExceptionCaseDetailResponse) -> str:
     ):
         action = detail.latest_approval_decision.decision
         label = "Retry workflow signal"
-        return _approval_form(detail.case_id, action, label, retry_only=True)
+        return _approval_form(
+            detail.case_id,
+            action,
+            label,
+            csrf_token=csrf_token,
+            retry_only=True,
+        )
 
     return "<p>No approval action is currently available.</p>"
 
@@ -228,17 +308,18 @@ def _approval_form(
     decision: ApprovalDecisionType,
     label: str,
     *,
+    csrf_token: str,
     retry_only: bool = False,
 ) -> str:
     path = "approve" if decision is ApprovalDecisionType.APPROVED else "reject"
     fields = ""
     if not retry_only:
         fields = (
-            '<label>Actor<input type="text" name="actor" maxlength="255" required></label>'
             '<label>Reason<textarea name="reason" maxlength="2000" required></textarea></label>'
         )
     return (
         f'<form method="post" action="/operator/exceptions/{escape(case_id)}/{path}">'
+        f'<input type="hidden" name="csrf_token" value="{escape(csrf_token)}">'
         f"{fields}"
         f'<button type="submit">{escape(label)}</button>'
         "</form>"
@@ -329,28 +410,18 @@ def _format_optional(value: bool | None) -> str:
         return "pending workflow policy"
     return "yes" if value else "no"
 
+def _get_operator_page_context(
+    request: Request,
+    *roles: OperatorRole,
+) -> tuple[OperatorIdentity, str] | RedirectResponse:
+    try:
+        operator, auth_session = get_operator_page_context(request, *roles)
+    except HTTPException:
+        return HTMLResponse(
+            render_page("Forbidden", "<h1>Forbidden</h1><p>insufficient_role</p>"),
+            status_code=403,
+        )
 
-def _page(title: str, body: str) -> str:
-    return (
-        "<!doctype html>"
-        "<html><head>"
-        f"<title>{escape(title)}</title>"
-        "<style>"
-        "body{font-family:system-ui,sans-serif;max-width:980px;margin:2rem auto;padding:0 1rem;line-height:1.5;}"
-        "table{border-collapse:collapse;width:100%;}"
-        "th,td{border:1px solid #d4d4d4;padding:0.5rem;text-align:left;vertical-align:top;}"
-        "dl{display:grid;grid-template-columns:max-content 1fr;gap:0.25rem 1rem;}"
-        "dt{font-weight:700;}"
-        "pre{background:#f5f5f5;padding:1rem;overflow:auto;}"
-        "form{border:1px solid #d4d4d4;padding:1rem;margin:0 0 1rem 0;}"
-        "label{display:block;font-weight:600;margin-bottom:0.5rem;}"
-        "input,textarea{display:block;width:100%;margin-top:0.25rem;margin-bottom:1rem;}"
-        "textarea{min-height:6rem;}"
-        "button{padding:0.5rem 0.75rem;}"
-        ".message{background:#ecfdf3;border:1px solid #86efac;padding:0.75rem;}"
-        ".error{background:#fef2f2;border:1px solid #fca5a5;padding:0.75rem;}"
-        "</style>"
-        "</head><body>"
-        f"{body}"
-        "</body></html>"
-    )
+    if operator is None or auth_session is None:
+        return build_operator_login_redirect(request)
+    return operator, auth_session.csrf_token

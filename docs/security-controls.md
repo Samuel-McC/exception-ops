@@ -32,14 +32,19 @@ Current implemented controls are still development-oriented, but they include:
 - explicit execution state on exception cases
 - additive execution records with request/result/failure payloads
 - bounded execution adapter allowlist with a mock-safe default
+- config-backed operator authentication
+- signed operator session cookies with TTL
+- explicit role checks on protected review/action routes
+- CSRF protection on login/logout and operator form actions
+- authenticated operator identity bound to persisted approval decisions
 
 ## Planned controls
 
 ### Authentication and authorization
-- authenticated operator access
-- role-based approval permissions
-- restricted execution/admin actions
-- explicit session/operator identity for sensitive decisions
+- SSO/OIDC or federated identity
+- delegated admin and richer operator lifecycle management
+- password reset / credential rotation flows
+- stronger admin separation for future execution/admin actions
 
 ### Secrets handling
 - API keys from environment variables
@@ -66,7 +71,11 @@ Current implemented controls are still development-oriented, but they include:
 
 ## Honest current limitation
 
-Phase 5 approval and execution are explicit, but they are not yet access-controlled. The approve/reject routes, operator UI, and execution path should still be treated as development/internal surfaces until auth/authz lands in a later phase.
+Phase 6 adds a real operator boundary, but it remains intentionally small:
+- credentials are config-backed rather than database-backed
+- there is no SSO/OIDC yet
+- there is no password reset or delegated admin flow yet
+- deployment hardening still depends on environment-specific ingress, TLS, and secret management outside the app
 
 ### Platform hardening
 - dockerized local environment

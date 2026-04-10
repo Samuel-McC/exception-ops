@@ -32,6 +32,7 @@ FastAPI provides:
 - exception listing/detail
 - explicit approve/reject routes
 - minimal server-rendered operator pages for exception review
+- operator login/logout
 - durable workflow kickoff on create
 - health endpoints
 - small operator/admin surfaces
@@ -58,6 +59,7 @@ PostgreSQL stores:
 - audit records
 - additive AI records for classification/remediation outputs and failures
 - additive approval decision records
+- additive execution records
 
 Schema evolution now runs through Alembic migrations. SQLAlchemy metadata remains the source for model definitions, but Alembic is the authoritative path for evolving existing databases.
 
@@ -101,6 +103,23 @@ Approval persistence is intentionally simple in this phase:
 - if signaling fails, the persisted decision remains visible and the same action can be retried to reconcile the workflow
 - the workflow completes by applying that decision idempotently
 
+## Operator auth boundary
+
+Phase 6 adds a minimal, config-backed operator security layer:
+- operator credentials and roles are loaded from env or a local file, not from the application database
+- session cookies are signed and time-bounded
+- operator HTML pages redirect unauthenticated users to login
+- protected JSON review/action routes return explicit `auth_required` or `insufficient_role` responses
+- CSRF protects login/logout and operator approval forms
+
+The current role model is intentionally small:
+- `reviewer`: inspect cases and AI/approval/execution metadata
+- `approver`: inspect plus approve/reject
+- `executor`: inspect execution-related state; no manual execute route exists yet
+- `admin`: full operator access
+
+This is a local/operator boundary, not a full IAM system. SSO/OIDC, password reset, and delegated administration remain later-phase work.
+
 ## Persistence evolution
 
 The repo previously relied on a temporary `create_all` bootstrap path. Phase 4.5 introduces Alembic so the intended local/dev path is:
@@ -111,7 +130,7 @@ The repo previously relied on a temporary `create_all` bootstrap path. Phase 4.5
 
 The `create_all` path remains available only as an explicit fallback flag for dev/test scenarios and should not be treated as the normal operational path.
 
-Later phases will extend this with evidence gathering and execution after approval.
+Later phases will extend this with broader evidence gathering, stronger operator lifecycle management, and evaluation/hardening work.
 
 ## Planned module map
 

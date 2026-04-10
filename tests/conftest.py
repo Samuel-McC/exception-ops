@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Generator
 from dataclasses import dataclass, field
 
@@ -14,6 +16,7 @@ from exception_ops.activities import classification as classification_activity
 from exception_ops.activities import execution as execution_activity
 from exception_ops.activities import remediation as remediation_activity
 from exception_ops.api.app import app
+from exception_ops.auth import hash_password
 from exception_ops.config import settings
 from exception_ops.db import Base, get_session
 from exception_ops.db import models as db_models  # noqa: F401
@@ -24,6 +27,43 @@ from exception_ops.temporal import (
     get_workflow_signaler,
     get_workflow_starter,
 )
+
+TEST_OPERATOR_PASSWORDS = {
+    "reviewer": "reviewer-password",
+    "approver": "approver-password",
+    "executor": "executor-password",
+    "admin": "admin-password",
+}
+TEST_OPERATOR_CONFIG = {
+    "reviewer": {
+        "password_hash": hash_password(
+            TEST_OPERATOR_PASSWORDS["reviewer"],
+            salt=b"reviewer-salt-01",
+        ),
+        "roles": ["reviewer"],
+    },
+    "approver": {
+        "password_hash": hash_password(
+            TEST_OPERATOR_PASSWORDS["approver"],
+            salt=b"approver-salt-01",
+        ),
+        "roles": ["reviewer", "approver"],
+    },
+    "executor": {
+        "password_hash": hash_password(
+            TEST_OPERATOR_PASSWORDS["executor"],
+            salt=b"executor-salt-01",
+        ),
+        "roles": ["reviewer", "executor"],
+    },
+    "admin": {
+        "password_hash": hash_password(
+            TEST_OPERATOR_PASSWORDS["admin"],
+            salt=b"admin-user-salt1",
+        ),
+        "roles": ["admin"],
+    },
+}
 
 
 @dataclass
@@ -61,12 +101,22 @@ def reset_ai_settings() -> Generator[None, None, None]:
         "ai_model": settings.ai_model,
         "openai_api_key": settings.openai_api_key,
         "execution_adapter": settings.execution_adapter,
+        "operator_session_secret": settings.operator_session_secret,
+        "operator_session_ttl_seconds": settings.operator_session_ttl_seconds,
+        "operator_secure_cookies": settings.operator_secure_cookies,
+        "operator_users_json": settings.operator_users_json,
+        "operator_users_file": settings.operator_users_file,
     }
     settings.ai_enabled = True
     settings.ai_provider = "mock"
     settings.ai_model = "mock-heuristic-v1"
     settings.openai_api_key = ""
     settings.execution_adapter = "mock"
+    settings.operator_session_secret = "test-session-secret"
+    settings.operator_session_ttl_seconds = 3600
+    settings.operator_secure_cookies = False
+    settings.operator_users_json = json.dumps(TEST_OPERATOR_CONFIG)
+    settings.operator_users_file = ""
     try:
         yield
     finally:
@@ -75,6 +125,11 @@ def reset_ai_settings() -> Generator[None, None, None]:
         settings.ai_model = original["ai_model"]
         settings.openai_api_key = original["openai_api_key"]
         settings.execution_adapter = original["execution_adapter"]
+        settings.operator_session_secret = original["operator_session_secret"]
+        settings.operator_session_ttl_seconds = original["operator_session_ttl_seconds"]
+        settings.operator_secure_cookies = original["operator_secure_cookies"]
+        settings.operator_users_json = original["operator_users_json"]
+        settings.operator_users_file = original["operator_users_file"]
 
 
 @pytest.fixture()
@@ -137,3 +192,33 @@ def client(
             yield test_client
     finally:
         app.dependency_overrides.clear()
+
+
+def extract_csrf_token(html: str) -> str:
+    match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+    if match is None:
+        raise AssertionError("csrf_token input not found in HTML")
+    return match.group(1)
+
+
+def login_as(
+    client: TestClient,
+    username: str,
+    *,
+    password: str | None = None,
+    next_path: str = "/operator/exceptions",
+) -> None:
+    login_page = client.get(f"/operator/login?next={next_path}")
+    assert login_page.status_code == 200
+    csrf_token = extract_csrf_token(login_page.text)
+    response = client.post(
+        "/operator/login",
+        data={
+            "username": username,
+            "password": password or TEST_OPERATOR_PASSWORDS[username],
+            "csrf_token": csrf_token,
+            "next": next_path,
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303

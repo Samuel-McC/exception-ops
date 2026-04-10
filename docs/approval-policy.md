@@ -37,6 +37,14 @@ Initial policy:
 - execution still passes through deterministic execution policy and an allowlisted action mapping
 - AI output does not approve, reject, or directly execute on behalf of an operator
 
+## Phase 6 operator authority
+
+- approval and rejection now require an authenticated operator session
+- approval actors are taken from the authenticated session identity, not caller-supplied request data
+- `approver` and `admin` roles can approve/reject
+- `reviewer` can inspect approval state and AI metadata but cannot make decisions
+- this is still a local/config-backed auth model, not full enterprise IAM
+
 ## Near-term rule
 
 In early phases, prefer stricter approval rather than looser automation.
