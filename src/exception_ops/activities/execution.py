@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from temporalio import activity
 
 from exception_ops.ai.schemas import RemediationPlanOutput
+from exception_ops.config import settings
 from exception_ops.db import get_session_factory
 from exception_ops.db.repositories import (
     create_execution_record,
@@ -126,17 +127,25 @@ async def execute_action(case_id: str) -> dict[str, str]:
             status=ExceptionStatus.IN_REVIEW,
         )
 
+        configured_adapter_name = _configured_execution_adapter_name()
         try:
-            adapter_result = await get_execution_adapter().execute(
+            adapter = get_execution_adapter()
+            configured_adapter_name = adapter.metadata.adapter
+            adapter_result = await adapter.execute(
                 action_name=policy_result.action_name,
                 exception_case=exception_case,
                 request_payload_json=request_payload_json,
             )
         except ExecutionAdapterConfigurationError as exc:
-            adapter_result_failure = {
-                "type": type(exc).__name__,
-                "message": str(exc),
-            }
+            adapter_result_failure = _normalize_execution_failure_payload(
+                {
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                },
+                adapter_name=configured_adapter_name,
+                action_name=policy_result.action_name.value,
+                stage="adapter_initialization",
+            )
             update_execution_record(
                 session,
                 execution_id=execution_record.execution_id,
@@ -163,7 +172,12 @@ async def execute_action(case_id: str) -> dict[str, str]:
                 session,
                 execution_id=execution_record.execution_id,
                 status=ExecutionRecordStatus.FAILED,
-                failure_payload_json=adapter_result.failure_payload_json,
+                failure_payload_json=_normalize_execution_failure_payload(
+                    adapter_result.failure_payload_json,
+                    adapter_name=configured_adapter_name,
+                    action_name=policy_result.action_name.value,
+                    stage="adapter_execute",
+                ),
             )
             update_exception_case_state(
                 session,
@@ -202,3 +216,24 @@ async def execute_action(case_id: str) -> dict[str, str]:
         }
     finally:
         session.close()
+
+
+def _configured_execution_adapter_name() -> str:
+    adapter_name = settings.execution_adapter.strip().lower()
+    return adapter_name or "unknown"
+
+
+def _normalize_execution_failure_payload(
+    failure_payload_json: dict[str, str] | None,
+    *,
+    adapter_name: str,
+    action_name: str,
+    stage: str,
+) -> dict[str, str]:
+    payload = dict(failure_payload_json or {})
+    payload.setdefault("type", "ExecutionAdapterFailure")
+    payload.setdefault("message", "Execution failed.")
+    payload["adapter_name"] = adapter_name
+    payload["action_name"] = action_name
+    payload["stage"] = stage
+    return payload

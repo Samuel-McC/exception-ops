@@ -37,7 +37,8 @@ Local development should support:
 ### Run worker
 - start Temporal worker for workflows and activities
 - run after the database has been migrated with Alembic
-- current workflow runs bounded classification/remediation activities and stays replay-safe
+- current workflow runs bounded evidence collection, classification, remediation, approval gating, and execution activities
+- workflow logic stays replay-safe because side effects remain inside activities
 
 ### Run migrations
 - create a blank revision:
@@ -54,6 +55,27 @@ For Docker-based local work, a simple pattern is:
 ### Run tests
 - focused pytest slices
 - full pytest suite
+- Ruff after tests
+
+### Replay fixtures
+- replay the full deterministic V1 fixture corpus:
+  - `make replay-fixtures`
+- replay one fixture:
+  - `uv run python scripts/replay_fixture.py --fixture-id approval-required-provider-failure`
+- stop after a selected stage:
+  - `uv run python scripts/replay_fixture.py --fixture-id approval-required-provider-failure --until-stage approval_gate`
+
+Replay is intentionally bounded:
+- it creates a new case and reuses the current explicit stages in-process
+- it does not start Temporal workflows
+- it is meant for local regression/demo work, not production reprocessing or benchmarking
+
+### Seeded demo path
+- run `alembic upgrade head`
+- start the API with `make run`
+- seed representative cases with `make replay-fixtures`
+- log in to `/operator/login` with the local operator credentials from `.env.example`
+- inspect approval, evidence, AI, and execution history through the operator UI
 
 ### Health
 - `/health`
@@ -128,6 +150,8 @@ If AI generation fails, the exception case remains available and the failure is 
 If evidence collection fails, the exception case remains available and the failure is stored as an additive evidence record. The workflow continues with whatever evidence is available instead of silently dropping the attempt.
 
 If execution fails, the failure is stored as an additive execution record and the case remains visible with `execution_state=failed`.
+
+If an evidence or execution adapter fails, the stored failure metadata now includes the adapter name and stage so replay output and operator detail stay inspectable without guessing where the failure occurred.
 
 ## Operational principles
 

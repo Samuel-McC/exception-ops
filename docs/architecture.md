@@ -49,7 +49,7 @@ Current implemented behavior is intentionally small:
 - the API attempts to start the workflow after persisting the case and ingest audit
 - workflow linkage is stored back on the exception record
 - if Temporal kickoff fails, the case remains persisted with `workflow_lifecycle_state=failed`
-- the workflow coordinates classification and remediation through activities
+- the workflow coordinates evidence collection, classification, remediation, approval gating, and bounded execution through activities
 - workflow lifecycle state remains coarse and workflow-level only: `started`, `completed`, or `failed`
 
 ### Application state
@@ -82,6 +82,19 @@ The evidence layer is also bounded and adapter-based:
 - additive evidence records with raw payload, summary, provenance, status, and failure metadata
 - no open web search, crawling, or generalized tool calling
 - evidence acts as supporting context for AI and operators, not as a replacement for source case truth
+
+### Replay and regression layer
+Phase 8 adds a bounded replay layer for V1 hardening:
+- a small fixture corpus under `fixtures/v1_cases.json`
+- deterministic replay through the current explicit stages
+- no extra orchestration runtime beyond the existing activities/adapters
+- honest output summaries for approval, AI, evidence, and execution results
+
+Replay is intentionally local/dev oriented:
+- it is suitable for regression checks and demos
+- it is not a benchmarking platform
+- it is not a generalized historical reprocessing engine
+- it should not be confused with Temporal workflow history replay
 
 ## Planned request / workflow shape
 
@@ -147,7 +160,9 @@ The repo previously relied on a temporary `create_all` bootstrap path. Phase 4.5
 
 The `create_all` path remains available only as an explicit fallback flag for dev/test scenarios and should not be treated as the normal operational path.
 
-Later phases will extend this with broader but still bounded evidence sources, stronger operator lifecycle management, and evaluation/hardening work.
+Later phases can extend this with broader but still bounded evidence sources, stronger operator lifecycle management, and richer evaluation beyond the current replay corpus.
+
+Phase 8 marks the current repo as a completed V1 foundation. V2 work should extend this base rather than replace it.
 
 ## Planned module map
 

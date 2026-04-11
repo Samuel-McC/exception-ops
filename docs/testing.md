@@ -47,6 +47,12 @@ ExceptionOps should prioritize:
 - login/logout and CSRF-protected operator form coverage
 - Alembic upgrade wiring and startup gating checks
 
+### Replay / regression tests
+- fixture-corpus validation for the bounded V1 replay set
+- deterministic replay through the explicit stage order
+- expectation matching for approval, evidence, AI, and execution outcomes
+- provider/adapter failure fixtures that stay honest about bounded failure paths
+
 ## Testing rule
 
 Focused tests first, full suite second.
@@ -59,5 +65,7 @@ Focused tests first, full suite second.
 - approval decision persistence and retry/reconciliation behavior
 - authenticated operator identity on approval decisions
 - signed session / CSRF protection on operator actions
+- replay fixture expectations and deterministic stage ordering
+- normalized evidence/execution failure metadata
 - migration baseline accuracy versus current SQLAlchemy metadata
 - audit record completeness

@@ -45,6 +45,13 @@ Initial policy:
 - `reviewer` can inspect approval state and AI metadata but cannot make decisions
 - this is still a local/config-backed auth model, not full enterprise IAM
 
+## Phase 8 replay interaction
+
+- replay fixtures can stop at the approval gate or include an explicit fixture approval decision
+- replay does not change approval authority semantics in the live system
+- approval still belongs to an authenticated human operator in normal app usage
+- replay exists for local regression/demo work, not to bypass the approval boundary
+
 ## Near-term rule
 
 In early phases, prefer stricter approval rather than looser automation.

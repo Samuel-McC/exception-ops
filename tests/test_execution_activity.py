@@ -9,6 +9,7 @@ from exception_ops.activities.classification import classify_exception
 from exception_ops.activities.evidence import collect_evidence
 from exception_ops.activities.execution import execute_action
 from exception_ops.activities.remediation import generate_remediation_plan
+from exception_ops.config import settings
 from exception_ops.db.repositories import (
     create_approval_decision,
     create_exception_case,
@@ -121,6 +122,9 @@ def test_execution_failure_is_persisted_honestly(
     assert execution_record is not None
     assert execution_record.status.value == "failed"
     assert execution_record.failure_payload_json is not None
+    assert execution_record.failure_payload_json["adapter_name"] == "mock"
+    assert execution_record.failure_payload_json["action_name"] == "retry_provider_after_validation"
+    assert execution_record.failure_payload_json["stage"] == "adapter_execute"
 
 
 def test_rejected_cases_do_not_execute(
@@ -175,3 +179,48 @@ def test_rejected_cases_do_not_execute(
     assert refreshed_case.execution_state is ExecutionState.SKIPPED
     assert refreshed_case.workflow_lifecycle_state is WorkflowLifecycleState.COMPLETED
     assert execution_record is None
+
+
+def test_execution_adapter_configuration_failure_is_persisted_honestly(
+    session_factory: sessionmaker[Session],
+    activity_db_overrides: None,
+) -> None:
+    settings.execution_adapter = "unsupported"
+
+    session = session_factory()
+    try:
+        exception_case, _ = create_exception_case(
+            session,
+            exception_type=ExceptionType.PROVIDER_FAILURE,
+            risk_level=RiskLevel.LOW,
+            summary="Provider timeout returned 502",
+            source_system="payments",
+            external_reference="txn-unsupported",
+            raw_context_json={"attempt": 1},
+        )
+        case_id = exception_case.case_id
+    finally:
+        session.close()
+
+    asyncio.run(collect_evidence(case_id))
+    asyncio.run(classify_exception(case_id))
+    asyncio.run(generate_remediation_plan(case_id))
+    asyncio.run(evaluate_approval_gate(case_id))
+    execution_result = asyncio.run(execute_action(case_id))
+
+    session = session_factory()
+    try:
+        refreshed_case = get_exception_case(session, case_id)
+        execution_record = get_latest_execution_record(session, case_id)
+    finally:
+        session.close()
+
+    assert execution_result["execution_state"] == "failed"
+    assert refreshed_case is not None
+    assert refreshed_case.execution_state is ExecutionState.FAILED
+    assert refreshed_case.workflow_lifecycle_state is WorkflowLifecycleState.FAILED
+    assert execution_record is not None
+    assert execution_record.failure_payload_json is not None
+    assert execution_record.failure_payload_json["adapter_name"] == "unsupported"
+    assert execution_record.failure_payload_json["action_name"] == "retry_provider_after_validation"
+    assert execution_record.failure_payload_json["stage"] == "adapter_initialization"

@@ -78,5 +78,46 @@ def test_collect_evidence_persists_failures_honestly(
     assert result["items_failed"] == 1
     assert len(evidence_history) == 1
     assert evidence_history[0].source_type is EvidenceSourceType.COLLECTION_ATTEMPT
+    assert evidence_history[0].adapter_name == "mock"
     assert evidence_history[0].status is EvidenceStatus.FAILED
     assert evidence_history[0].failure_json is not None
+    assert evidence_history[0].failure_json["adapter_name"] == "mock"
+    assert evidence_history[0].failure_json["stage"] == "adapter_collect"
+    assert evidence_history[0].failure_json["source_name"] == "evidence_collection"
+
+
+def test_collect_evidence_normalizes_failed_item_metadata(
+    session_factory: sessionmaker[Session],
+    activity_db_overrides: None,
+) -> None:
+    session = session_factory()
+    try:
+        exception_case, _ = create_exception_case(
+            session,
+            exception_type=ExceptionType.DUPLICATE_RECORD_RISK,
+            risk_level=RiskLevel.LOW,
+            summary="Possible duplicate supplier remittance records",
+            source_system="reconciliation",
+            external_reference="dup-123",
+            raw_context_json={"force_related_lookup_failure": True},
+        )
+        case_id = exception_case.case_id
+    finally:
+        session.close()
+
+    result = asyncio.run(collect_evidence(case_id))
+
+    session = session_factory()
+    try:
+        evidence_history = list_evidence_records(session, case_id)
+    finally:
+        session.close()
+
+    assert result["items_collected"] == 2
+    assert result["items_failed"] == 1
+    failed_item = next(item for item in evidence_history if item.status is EvidenceStatus.FAILED)
+    assert failed_item.adapter_name == "mock"
+    assert failed_item.failure_json is not None
+    assert failed_item.failure_json["adapter_name"] == "mock"
+    assert failed_item.failure_json["stage"] == "adapter_item"
+    assert failed_item.failure_json["source_name"] == "related_internal_lookup"

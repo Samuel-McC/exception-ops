@@ -68,9 +68,28 @@ Build ExceptionOps as a production-minded AI-assisted exception-resolution syste
 
 ## Phase 8 — Evaluation and hardening
 - regression fixtures
-- provider failure behavior
-- replay and operational polish
-- future security and deployment hardening beyond the local operator model
+- deterministic replay through the current explicit stages
+- tighter provider/adapter failure inspectability
+- local/demo operational polish and clearer V1 guidance
+
+## V1 status
+
+Phases 1 through 8 now form the current V1:
+- ingest and durable workflow linkage
+- bounded evidence and AI
+- human approval gating
+- bounded execution
+- protected operator UI/actions
+- Alembic-backed schema evolution
+- deterministic replay fixtures for regression and demos
+
+V2 should build on this base rather than replace it.
+
+Likely V2 directions:
+- richer non-mock provider and adapter integrations
+- broader but still bounded evaluation/comparison workflows
+- stronger deployment and operator lifecycle hardening
+- multi-model routing only after V1 baselines remain stable
 
 ## Out of scope for now
 - multi-agent platforming

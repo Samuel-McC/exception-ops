@@ -1,0 +1,163 @@
+{
+  "corpus_version": "v1",
+  "fixtures": [
+    {
+      "fixture_id": "approval-required-provider-failure",
+      "title": "Approval-required provider failure",
+      "description": "A medium-risk provider failure requires approval before the bounded execution step can complete successfully.",
+      "request": {
+        "exception_type": "provider_failure",
+        "risk_level": "medium",
+        "summary": "Provider returned 502 during payout reconciliation for a queued retry job.",
+        "source_system": "payments",
+        "external_reference": "txn-approval-001",
+        "raw_context_json": {
+          "attempt": 1,
+          "job_id": "job-approval-001",
+          "provider_status": "502"
+        }
+      },
+      "approval_decision": {
+        "decision": "approved",
+        "actor": "fixture:approver",
+        "reason": "Approved for deterministic bounded replay."
+      },
+      "expectations": {
+        "approval_state": "approved",
+        "execution_state": "succeeded",
+        "workflow_lifecycle_state": "completed",
+        "classification_status": "succeeded",
+        "remediation_status": "succeeded",
+        "normalized_exception_type": "provider_failure",
+        "recommended_action": "retry_provider_after_validation",
+        "latest_execution_action_name": "retry_provider_after_validation",
+        "latest_execution_status": "succeeded",
+        "evidence_succeeded": 2,
+        "evidence_failed": 0
+      }
+    },
+    {
+      "fixture_id": "no-approval-required-missing-document",
+      "title": "No-approval-required missing document",
+      "description": "A low-risk missing-document case proceeds without approval and executes through the bounded request-missing-document path.",
+      "request": {
+        "exception_type": "missing_document",
+        "risk_level": "low",
+        "summary": "The payout packet is missing the supplier invoice attachment.",
+        "source_system": "documents",
+        "external_reference": "doc-1001",
+        "raw_context_json": {
+          "requested_by": "documents-service"
+        }
+      },
+      "expectations": {
+        "approval_state": "not_required",
+        "execution_state": "succeeded",
+        "workflow_lifecycle_state": "completed",
+        "classification_status": "succeeded",
+        "remediation_status": "succeeded",
+        "normalized_exception_type": "missing_document",
+        "recommended_action": "request_missing_document",
+        "latest_execution_action_name": "request_missing_document",
+        "latest_execution_status": "succeeded",
+        "evidence_succeeded": 2,
+        "evidence_failed": 0
+      }
+    },
+    {
+      "fixture_id": "incomplete-evidence-duplicate-record-risk",
+      "title": "Incomplete evidence duplicate-record risk",
+      "description": "A duplicate-record-risk case collects partial evidence, records the failed evidence item honestly, and still proceeds through bounded planning and execution.",
+      "request": {
+        "exception_type": "duplicate_record_risk",
+        "risk_level": "low",
+        "summary": "Potential duplicate supplier remittance records need bounded review.",
+        "source_system": "reconciliation",
+        "external_reference": "dup-2201",
+        "raw_context_json": {
+          "force_related_lookup_failure": true
+        }
+      },
+      "expectations": {
+        "approval_state": "not_required",
+        "execution_state": "succeeded",
+        "workflow_lifecycle_state": "completed",
+        "classification_status": "succeeded",
+        "remediation_status": "succeeded",
+        "normalized_exception_type": "duplicate_record_risk",
+        "recommended_action": "review_duplicate_records",
+        "latest_execution_action_name": "review_duplicate_records",
+        "latest_execution_status": "succeeded",
+        "evidence_succeeded": 2,
+        "evidence_failed": 1
+      }
+    },
+    {
+      "fixture_id": "ai-provider-configuration-failure",
+      "title": "AI provider configuration failure",
+      "description": "A low-risk provider-failure case records AI provider failures honestly and falls back to bounded manual triage execution.",
+      "request": {
+        "exception_type": "provider_failure",
+        "risk_level": "low",
+        "summary": "Provider timeout repeated during low-risk reconciliation retry.",
+        "source_system": "payments",
+        "external_reference": "txn-ai-fail-001",
+        "raw_context_json": {
+          "attempt": 1,
+          "job_id": "job-ai-fail-001"
+        }
+      },
+      "settings_overrides": {
+        "ai_provider": "openai",
+        "ai_model": "gpt-5.4-mini",
+        "openai_api_key": ""
+      },
+      "expectations": {
+        "approval_state": "not_required",
+        "execution_state": "succeeded",
+        "workflow_lifecycle_state": "completed",
+        "classification_status": "failed",
+        "remediation_status": "failed",
+        "normalized_exception_type": null,
+        "recommended_action": null,
+        "latest_execution_action_name": "manual_triage",
+        "latest_execution_status": "succeeded",
+        "evidence_succeeded": 2,
+        "evidence_failed": 0
+      }
+    },
+    {
+      "fixture_id": "execution-adapter-configuration-failure",
+      "title": "Execution adapter configuration failure",
+      "description": "A low-risk provider-failure case reaches execution but records a configured execution-adapter failure instead of pretending the action ran.",
+      "request": {
+        "exception_type": "provider_failure",
+        "risk_level": "low",
+        "summary": "Provider returned 502 during a low-risk scheduled retry.",
+        "source_system": "payments",
+        "external_reference": "txn-exec-fail-001",
+        "raw_context_json": {
+          "attempt": 1,
+          "job_id": "job-exec-fail-001",
+          "provider_status": "502"
+        }
+      },
+      "settings_overrides": {
+        "execution_adapter": "unsupported"
+      },
+      "expectations": {
+        "approval_state": "not_required",
+        "execution_state": "failed",
+        "workflow_lifecycle_state": "failed",
+        "classification_status": "succeeded",
+        "remediation_status": "succeeded",
+        "normalized_exception_type": "provider_failure",
+        "recommended_action": "retry_provider_after_validation",
+        "latest_execution_action_name": "retry_provider_after_validation",
+        "latest_execution_status": "failed",
+        "evidence_succeeded": 2,
+        "evidence_failed": 0
+      }
+    }
+  ]
+}

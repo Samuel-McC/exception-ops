@@ -39,6 +39,8 @@ Current implemented controls are still development-oriented, but they include:
 - explicit role checks on protected review/action routes
 - CSRF protection on login/logout and operator form actions
 - authenticated operator identity bound to persisted approval decisions
+- replay fixtures and local replay tooling that stay bounded to explicit stages and adapters
+- clearer failure metadata on evidence/execution records for adapter-level inspection
 
 ## Planned controls
 
@@ -71,6 +73,7 @@ Current implemented controls are still development-oriented, but they include:
 - provenance remains visible with each evidence record
 - raw evidence is preserved separately from summaries
 - evidence failures are stored explicitly
+- replay uses only stored fixtures and existing allowlisted adapters, not arbitrary tool invocation
 
 ### Workflow / execution safety
 - durable workflow history
@@ -87,6 +90,7 @@ Phase 6 adds a real operator boundary, but it remains intentionally small:
 - there is no password reset or delegated admin flow yet
 - deployment hardening still depends on environment-specific ingress, TLS, and secret management outside the app
 - evidence gathering is bounded and adapter-backed, not a generalized research or agent system
+- replay is local/dev oriented and should not be treated as a protected production reprocessing surface
 
 ### Platform hardening
 - dockerized local environment

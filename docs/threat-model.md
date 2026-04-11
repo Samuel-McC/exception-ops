@@ -62,6 +62,7 @@ Mitigation direction:
 - retries are controlled
 - execution attempts are recorded
 - execution adapters are bounded and explicit
+- execution failure metadata identifies the adapter boundary that failed
 - later, idempotency keys where relevant
 
 ### Incomplete evidence or bad classification
@@ -78,7 +79,7 @@ Mitigation direction:
 - clear operator visibility
 - confidence/risk fields are exposed in structured AI output
 - approval decisions are stored separately from AI suggestions
-- evaluation and test fixtures later
+- deterministic replay fixtures for regression checks
 
 ### Evidence provenance drift
 Risk:
@@ -90,6 +91,7 @@ Mitigation direction:
 - raw evidence payloads are preserved separately from summaries
 - failed evidence attempts are stored explicitly
 - detail views expose evidence provenance directly
+- replay and operator detail preserve adapter/stage failure metadata for bounded evidence failures
 
 ### Approval signaling drift
 Risk:
@@ -116,6 +118,6 @@ At early stages, the main residual risks are:
 - local-only auth model without SSO/OIDC
 - no password reset or delegated admin lifecycle yet
 - weak deployment defaults
-- immature evaluation of AI outputs
+- replay coverage is still a small curated fixture corpus rather than a broad evaluation platform
 - evidence sources are still bounded and mock/local-safe rather than broad production integrations
 - execution side effects are still mock/local-safe rather than real production integrations
