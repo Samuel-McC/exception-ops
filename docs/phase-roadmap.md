@@ -85,11 +85,19 @@ Phases 1 through 8 now form the current V1:
 
 V2 should build on this base rather than replace it.
 
-Likely V2 directions:
+## V2 Phase 1 — Multi-step AI orchestration and model routing
+- explicit triage/classifier path vs planning/remediation path
+- dedicated routing policy by task and bounded complexity signals
+- confidence-aware planning escalation
+- optional provider fallback visibility
+- additive usage/cost/trace metadata on existing `ai_records`
+- operator/detail visibility into compact AI route trace
+
+Later V2 directions:
 - richer non-mock provider and adapter integrations
 - broader but still bounded evaluation/comparison workflows
 - stronger deployment and operator lifecycle hardening
-- multi-model routing only after V1 baselines remain stable
+- anything more agent-like only if it remains bounded and auditable
 
 ## Out of scope for now
 - multi-agent platforming

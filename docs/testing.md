@@ -11,6 +11,7 @@ ExceptionOps should prioritize:
 - auth/authz and CSRF boundaries
 - activity failure handling
 - audit/event correctness
+- AI routing and fallback visibility
 
 ## Expected test layers
 
@@ -18,6 +19,7 @@ ExceptionOps should prioritize:
 - domain logic
 - evidence adapter behavior
 - AI provider formatting/parsing
+- AI routing decisions and compatibility behavior
 - approval policy
 - repositories/helpers
 
@@ -34,6 +36,7 @@ ExceptionOps should prioritize:
 - honest kickoff-failure behavior
 - detail visibility for collected evidence
 - detail visibility for latest AI records
+- detail visibility for AI route/usage/trace metadata
 - approve/reject route behavior
 - auth-required and insufficient-role behavior on protected JSON routes
 - honest approval-signal failure behavior
@@ -52,6 +55,7 @@ ExceptionOps should prioritize:
 - deterministic replay through the explicit stage order
 - expectation matching for approval, evidence, AI, and execution outcomes
 - provider/adapter failure fixtures that stay honest about bounded failure paths
+- V1 replay compatibility under the V2 config layer
 
 ## Testing rule
 
@@ -62,6 +66,7 @@ Focused tests first, full suite second.
 - workflow kickoff persistence
 - evidence persistence, provenance visibility, and failure capture
 - AI record persistence and failure capture
+- AI routing/escalation/fallback metadata persistence
 - approval decision persistence and retry/reconciliation behavior
 - authenticated operator identity on approval decisions
 - signed session / CSRF protection on operator actions

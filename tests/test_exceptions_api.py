@@ -174,10 +174,19 @@ def test_get_exception_detail_returns_ai_and_pending_approval_metadata(
     assert body["evidence_history"][0]["adapter_name"] == "mock"
     assert body["latest_classification"]["status"] == "succeeded"
     assert body["latest_classification"]["provider"] == "mock"
+    assert body["latest_classification"]["route"]["path_name"] == "triage"
+    assert body["latest_classification"]["usage"]["total_tokens"] is not None
+    assert body["latest_classification"]["trace"]["model_path"] == "triage"
     assert body["latest_classification"]["output"]["normalized_exception_type"] == "provider_failure"
     assert body["latest_remediation"]["status"] == "succeeded"
+    assert body["latest_remediation"]["route"]["path_name"] == "planner_default"
+    assert body["latest_remediation"]["usage"]["total_tokens"] is not None
+    assert body["latest_remediation"]["trace"]["model_path"] == "planner_default"
     assert body["latest_remediation"]["output"]["recommended_action"] == "retry_provider_after_validation"
     assert body["latest_remediation"]["output"]["requires_approval"] is True
+    assert body["ai_trace"]["triage"]["model_path"] == "triage"
+    assert body["ai_trace"]["planning"]["model_path"] == "planner_default"
+    assert body["ai_trace"]["fallback_occurred"] is False
     assert body["latest_approval_decision"] is None
     assert body["latest_execution"] is None
 

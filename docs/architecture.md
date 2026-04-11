@@ -52,26 +52,39 @@ Current implemented behavior is intentionally small:
 - the workflow coordinates evidence collection, classification, remediation, approval gating, and bounded execution through activities
 - workflow lifecycle state remains coarse and workflow-level only: `started`, `completed`, or `failed`
 
+Stable baseline:
+- V1.0.0 is the completed V1 system this branch extends
+- V2 Phase 1 keeps the workflow order intact and changes only the AI-orchestration seam inside the existing classification/remediation stages
+
 ### Application state
 PostgreSQL stores:
 - exception cases
 - workflow linkage metadata
 - audit records
 - additive evidence records with provenance and failure metadata
-- additive AI records for classification/remediation outputs and failures
+- additive AI records for classification/remediation outputs, failures, and V2 routing/usage/trace metadata
 - additive approval decision records
 - additive execution records
 
 Schema evolution now runs through Alembic migrations. SQLAlchemy metadata remains the source for model definitions, but Alembic is the authoritative path for evolving existing databases.
 
 ### AI layer
-The AI layer is bounded and provider-based:
+The AI layer remains bounded and provider-based.
+
+Stable V1 behavior:
 - structured classification
 - structured remediation memo generation
 - explicit prompt versioning
 - provider/model metadata capture
 - mock-safe local behavior by default
-- later, optional evaluation or confidence/risk guidance
+
+V2 Phase 1 additions:
+- explicit classifier/triage and planner/remediation split
+- dedicated routing policy in code
+- confidence-aware escalation into an optional stronger planning path
+- optional provider fallback with visible attempts
+- best-effort usage/cost metadata
+- compact operator-visible trace metadata without chain-of-thought exposure
 
 The AI layer does not own execution authority.
 
@@ -108,8 +121,8 @@ Replay is intentionally local/dev oriented:
 ### Workflow
 1. accept `case_id`
 2. collect bounded evidence through an activity
-3. run structured AI classification activity using the source case plus collected evidence
-4. run structured AI remediation activity using the source case, collected evidence, and any classification output
+3. run structured AI triage/classification activity using the source case plus collected evidence
+4. run structured AI planning/remediation activity using the source case, collected evidence, and any classification output
 5. evaluate deterministic approval policy
 6. if approval is not required, mark the case as `approval_state=not_required` and complete the current workflow phase
 7. if approval is required, mark the case as `approval_state=pending` and wait for a workflow signal
@@ -163,6 +176,12 @@ The `create_all` path remains available only as an explicit fallback flag for de
 Later phases can extend this with broader but still bounded evidence sources, stronger operator lifecycle management, and richer evaluation beyond the current replay corpus.
 
 Phase 8 marks the current repo as a completed V1 foundation. V2 work should extend this base rather than replace it.
+
+V2 Phase 1 is still explicitly not:
+- a generalized agent system
+- a workflow redesign
+- open-ended tool orchestration
+- a benchmarking/eval platform
 
 ## Planned module map
 

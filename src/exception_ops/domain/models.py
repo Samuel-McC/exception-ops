@@ -65,6 +65,9 @@ class AIRecord:
     prompt_version: str
     payload_json: JsonObject | None
     failure_json: JsonObject | None
+    route_json: JsonObject | None
+    usage_json: JsonObject | None
+    trace_json: JsonObject | None
     created_at: datetime
 
 

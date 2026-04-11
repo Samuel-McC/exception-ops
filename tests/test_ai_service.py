@@ -63,11 +63,18 @@ def test_mock_provider_returns_structured_classification() -> None:
     assert result.status.value == "succeeded"
     assert result.provider == "mock"
     assert result.model == "mock-heuristic-v1"
-    assert result.prompt_version == "classification.v2"
+    assert result.prompt_version == "classification.v3.triage"
     assert result.payload_json is not None
     assert result.payload_json["normalized_exception_type"] == "provider_failure"
     assert "supporting_evidence" in result.payload_json["missing_information"]
     assert result.failure_json is None
+    assert result.route_json is not None
+    assert result.route_json["path_name"] == "triage"
+    assert result.route_json["compatibility_mode"] is True
+    assert result.usage_json is not None
+    assert result.usage_json["total_tokens"] is not None
+    assert result.trace_json is not None
+    assert result.trace_json["model_path"] == "triage"
 
 
 def test_mock_provider_returns_structured_remediation_plan() -> None:
@@ -83,10 +90,14 @@ def test_mock_provider_returns_structured_remediation_plan() -> None:
 
     assert result.status.value == "succeeded"
     assert result.provider == "mock"
-    assert result.prompt_version == "remediation.v2"
+    assert result.prompt_version == "remediation.v3.plan"
     assert result.payload_json is not None
     assert result.payload_json["recommended_action"] == "retry_provider_after_validation"
     assert result.payload_json["requires_approval"] is True
+    assert result.route_json is not None
+    assert result.route_json["path_name"] == "planner_default"
+    assert result.trace_json is not None
+    assert result.trace_json["model_path"] == "planner_default"
 
 
 def test_mock_provider_uses_evidence_as_additional_context() -> None:
@@ -100,6 +111,86 @@ def test_mock_provider_uses_evidence_as_additional_context() -> None:
     assert "1 supporting evidence item" in result.payload_json["reasoning_summary"]
 
 
+def test_task_specific_model_config_splits_triage_and_planning_paths() -> None:
+    settings.ai_triage_provider = "mock"
+    settings.ai_triage_model = "mock-triage-v2"
+    settings.ai_planner_provider = "mock"
+    settings.ai_planner_model = "mock-planner-v2"
+
+    classification_result = asyncio.run(get_ai_service().classify_exception(_build_case()))
+    planning_result = asyncio.run(
+        get_ai_service().generate_remediation_plan(
+            _build_case(),
+            ClassificationOutput(
+                normalized_exception_type=ExceptionType.PROVIDER_FAILURE,
+                confidence=0.92,
+                risk_level_suggestion=RiskLevel.LOW,
+                reasoning_summary="Confident triage",
+                missing_information=[],
+            ),
+        )
+    )
+
+    assert classification_result.model == "mock-triage-v2"
+    assert classification_result.route_json is not None
+    assert classification_result.route_json["selected_model"] == "mock-triage-v2"
+    assert planning_result.model == "mock-planner-v2"
+    assert planning_result.route_json is not None
+    assert planning_result.route_json["selected_model"] == "mock-planner-v2"
+
+
+def test_planner_escalation_is_visible_for_low_confidence_cases() -> None:
+    settings.ai_planner_provider = "mock"
+    settings.ai_planner_model = "mock-planner-v2"
+    settings.ai_planner_escalation_provider = "mock"
+    settings.ai_planner_escalation_model = "mock-planner-strong-v2"
+
+    result = asyncio.run(
+        get_ai_service().generate_remediation_plan(
+            _build_case(),
+            ClassificationOutput(
+                normalized_exception_type=ExceptionType.UNKNOWN,
+                confidence=0.42,
+                risk_level_suggestion=RiskLevel.MEDIUM,
+                reasoning_summary="Low confidence triage with missing context.",
+                missing_information=["supporting_evidence"],
+            ),
+            [],
+        )
+    )
+
+    assert result.status.value == "succeeded"
+    assert result.model == "mock-planner-strong-v2"
+    assert result.route_json is not None
+    assert result.route_json["path_name"] == "planner_escalated"
+    assert result.route_json["escalation_requested"] is True
+    assert result.route_json["escalated"] is True
+    assert "triage_confidence_below_threshold" in result.route_json["routing_factors"]
+    assert result.trace_json is not None
+    assert result.trace_json["escalation_occurred"] is True
+
+
+def test_provider_fallback_is_visible_and_honest() -> None:
+    settings.ai_provider = "openai"
+    settings.ai_model = "gpt-5.4-mini"
+    settings.openai_api_key = ""
+    settings.ai_fallback_provider = "mock"
+    settings.ai_fallback_model = "mock-fallback-v1"
+
+    result = asyncio.run(get_ai_service().classify_exception(_build_case()))
+
+    assert result.status.value == "succeeded"
+    assert result.provider == "mock"
+    assert result.model == "mock-fallback-v1"
+    assert result.route_json is not None
+    assert result.route_json["fallback_occurred"] is True
+    assert len(result.route_json["attempts"]) == 2
+    assert result.route_json["attempts"][0]["outcome"] == "failed"
+    assert result.route_json["attempts"][1]["outcome"] == "succeeded"
+    assert result.trace_json is not None
+    assert result.trace_json["fallback_occurred"] is True
+
+
 def test_openai_provider_configuration_failure_is_reported_honestly() -> None:
     settings.ai_provider = "openai"
     settings.ai_model = "gpt-5.4-mini"
@@ -110,6 +201,8 @@ def test_openai_provider_configuration_failure_is_reported_honestly() -> None:
     assert result.status.value == "failed"
     assert result.provider == "openai"
     assert result.model == "gpt-5.4-mini"
+    assert result.route_json is not None
+    assert result.route_json["fallback_occurred"] is False
     assert result.failure_json == {
         "type": "ProviderConfigurationError",
         "message": "OPENAI_API_KEY is required when AI_PROVIDER=openai",

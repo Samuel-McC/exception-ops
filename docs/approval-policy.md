@@ -19,6 +19,7 @@ Initial policy:
 - AI recommendation is not approval
 - execution permission is separate from AI output
 - AI `requires_approval` and `execution_risk` are advisory metadata only
+- V2 routing/escalation metadata is also advisory only
 - actual approval routing and wait states are implemented in Phase 4
 
 ## Implemented in Phase 4
@@ -51,6 +52,12 @@ Initial policy:
 - replay does not change approval authority semantics in the live system
 - approval still belongs to an authenticated human operator in normal app usage
 - replay exists for local regression/demo work, not to bypass the approval boundary
+
+## V2 Phase 1 AI orchestration interaction
+
+- classifier/planner split and routing metadata do not change approval authority
+- a stronger planning path can be selected for bounded reasoning, but that still does not approve anything
+- fallback/escalation visibility improves operator context without altering the deterministic approval policy
 
 ## Near-term rule
 

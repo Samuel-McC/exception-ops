@@ -68,6 +68,9 @@ def test_operator_exception_detail_renders_ai_and_approval_controls(
     assert "Execution State" in response.text
     assert "Collected Evidence" in response.text
     assert "Provenance" in response.text
+    assert "AI Trace" in response.text
+    assert "planner_default" in response.text
+    assert "triage" in response.text
     assert "retry_provider_after_validation" in response.text
     assert f'/operator/exceptions/{created["case_id"]}/approve' in response.text
     assert f'/operator/exceptions/{created["case_id"]}/reject' in response.text

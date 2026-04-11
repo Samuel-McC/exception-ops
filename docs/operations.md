@@ -9,6 +9,7 @@ Local development should support:
 - Temporal workflow kickoff and worker execution
 - bounded evidence collection with a safe local adapter path
 - bounded AI classification/remediation with a safe local provider path
+- bounded AI routing between triage and planning paths
 - explicit approval gating and operator review
 - bounded execution with a safe local adapter path
 - local/operator authentication for protected review/action routes
@@ -119,8 +120,21 @@ If approval signaling fails after a decision is recorded, the API returns an hon
 - older local databases created through earlier bootstrap flows may still need a reset before adopting Alembic cleanly
 
 ### AI provider modes
-- `AI_PROVIDER=mock` is the safe local default
-- `AI_PROVIDER=openai` is opt-in and requires `OPENAI_API_KEY`
+- stable V1-compatible path:
+  - `AI_PROVIDER=mock`
+  - `AI_MODEL=mock-heuristic-v1`
+- V2 Phase 1 task-specific overrides are optional:
+  - `AI_TRIAGE_PROVIDER`
+  - `AI_TRIAGE_MODEL`
+  - `AI_PLANNER_PROVIDER`
+  - `AI_PLANNER_MODEL`
+  - `AI_PLANNER_ESCALATION_PROVIDER`
+  - `AI_PLANNER_ESCALATION_MODEL`
+  - `AI_FALLBACK_PROVIDER`
+  - `AI_FALLBACK_MODEL`
+  - `AI_TRIAGE_CONFIDENCE_THRESHOLD`
+- `AI_PROVIDER=openai` remains opt-in and requires `OPENAI_API_KEY`
+- if task-specific settings are unset, the app stays on the V1-compatible global provider/model path
 
 ### Evidence adapter modes
 - `EVIDENCE_ADAPTER=mock` is the safe local default
@@ -147,6 +161,8 @@ Current auth limitations:
 
 If AI generation fails, the exception case remains available and the failure is stored as an additive AI record.
 
+If AI routing requests a stronger planning path, that escalation is stored on the corresponding AI record. If provider fallback is configured and used, the fallback attempt is also stored on the AI record instead of being hidden behind fake success.
+
 If evidence collection fails, the exception case remains available and the failure is stored as an additive evidence record. The workflow continues with whatever evidence is available instead of silently dropping the attempt.
 
 If execution fails, the failure is stored as an additive execution record and the case remains visible with `execution_state=failed`.
@@ -159,5 +175,6 @@ If an evidence or execution adapter fails, the stored failure metadata now inclu
 - activities should own side effects
 - evidence should remain bounded, additive, and provenance-first
 - AI should remain additive and bounded
+- AI routing should remain explicit, task-bounded, and inspectable
 - approval and execution should always be inspectable
 - AI remains advisory while execution stays bounded and explicit

@@ -61,11 +61,19 @@ def test_ai_activities_persist_outputs_without_auto_completing_workflow(
     assert classification.status is AIRecordStatus.SUCCEEDED
     assert classification.payload_json is not None
     assert classification.payload_json["normalized_exception_type"] == "provider_failure"
+    assert classification.route_json is not None
+    assert classification.route_json["path_name"] == "triage"
+    assert classification.usage_json is not None
+    assert classification.trace_json is not None
 
     assert remediation is not None
     assert remediation.status is AIRecordStatus.SUCCEEDED
     assert remediation.payload_json is not None
     assert remediation.payload_json["recommended_action"] == "retry_provider_after_validation"
+    assert remediation.route_json is not None
+    assert remediation.route_json["path_name"] == "planner_default"
+    assert remediation.usage_json is not None
+    assert remediation.trace_json is not None
 
     assert refreshed_case is not None
     assert refreshed_case.workflow_lifecycle_state is WorkflowLifecycleState.STARTED
@@ -110,10 +118,14 @@ def test_ai_failures_are_persisted_without_auto_approval_or_terminal_state(
     assert classification is not None
     assert classification.status is AIRecordStatus.FAILED
     assert classification.failure_json is not None
+    assert classification.route_json is not None
+    assert classification.trace_json is not None
 
     assert remediation is not None
     assert remediation.status is AIRecordStatus.FAILED
     assert remediation.failure_json is not None
+    assert remediation.route_json is not None
+    assert remediation.trace_json is not None
 
     assert refreshed_case is not None
     assert refreshed_case.workflow_lifecycle_state is WorkflowLifecycleState.STARTED

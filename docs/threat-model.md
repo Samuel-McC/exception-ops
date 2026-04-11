@@ -47,6 +47,7 @@ Mitigation direction:
 - AI is advisory only
 - structured output contracts
 - provider/model/prompt metadata are persisted with each AI record
+- routing, fallback, and compact trace metadata are persisted with each AI record
 - AI failures are stored explicitly instead of hidden behind fallback execution
 - deterministic execution path
 - explicit approval for risky actions
@@ -80,6 +81,7 @@ Mitigation direction:
 - confidence/risk fields are exposed in structured AI output
 - approval decisions are stored separately from AI suggestions
 - deterministic replay fixtures for regression checks
+- explicit routing tests for bounded escalation/fallback behavior
 
 ### Evidence provenance drift
 Risk:
@@ -121,3 +123,4 @@ At early stages, the main residual risks are:
 - replay coverage is still a small curated fixture corpus rather than a broad evaluation platform
 - evidence sources are still bounded and mock/local-safe rather than broad production integrations
 - execution side effects are still mock/local-safe rather than real production integrations
+- V2 Phase 1 routing remains bounded but still depends on careful config review to avoid misleading “strong model” expectations in dev setups

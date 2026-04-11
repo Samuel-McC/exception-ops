@@ -55,6 +55,9 @@ async def generate_remediation_plan(case_id: str) -> dict[str, str]:
             prompt_version=result.prompt_version,
             payload_json=result.payload_json,
             failure_json=result.failure_json,
+            route_json=result.route_json,
+            usage_json=result.usage_json,
+            trace_json=result.trace_json,
         )
 
         return {

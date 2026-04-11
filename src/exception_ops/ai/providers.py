@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Any, Protocol, TypeVar
 
 from openai import AsyncOpenAI
@@ -23,6 +24,21 @@ class ProviderMetadata:
     model: str
 
 
+@dataclass(slots=True)
+class ProviderUsage:
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    estimated_cost_usd: float | None = None
+    is_estimated: bool = False
+
+
+@dataclass(slots=True)
+class StructuredGenerationResult:
+    output: BaseModel
+    usage: ProviderUsage | None = None
+
+
 class AIProvider(Protocol):
     metadata: ProviderMetadata
 
@@ -35,13 +51,13 @@ class AIProvider(Protocol):
         user_prompt: str,
         prompt_context: dict[str, Any],
         response_model: type[ModelT],
-    ) -> ModelT:
+    ) -> StructuredGenerationResult:
         ...
 
 
 class MockAIProvider:
-    def __init__(self) -> None:
-        self.metadata = ProviderMetadata(provider="mock", model=MOCK_MODEL_NAME)
+    def __init__(self, *, model: str = MOCK_MODEL_NAME) -> None:
+        self.metadata = ProviderMetadata(provider="mock", model=model)
 
     async def generate_structured(
         self,
@@ -52,7 +68,7 @@ class MockAIProvider:
         user_prompt: str,
         prompt_context: dict[str, Any],
         response_model: type[ModelT],
-    ) -> ModelT:
+    ) -> StructuredGenerationResult:
         del prompt_version, system_prompt, user_prompt
 
         if response_model is ClassificationOutput:
@@ -62,7 +78,23 @@ class MockAIProvider:
         else:
             raise ProviderConfigurationError(f"Unsupported mock response model for task {task_name}")
 
-        return response_model.model_validate(payload)
+        output = response_model.model_validate(payload)
+        prompt_tokens_estimate = max(
+            1,
+            (len(json.dumps(prompt_context, sort_keys=True)) + len(task_name)) // 4,
+        )
+        output_tokens_estimate = max(1, len(json.dumps(payload, sort_keys=True)) // 4)
+        total_tokens_estimate = prompt_tokens_estimate + output_tokens_estimate
+        return StructuredGenerationResult(
+            output=output,
+            usage=ProviderUsage(
+                input_tokens=prompt_tokens_estimate,
+                output_tokens=output_tokens_estimate,
+                total_tokens=total_tokens_estimate,
+                estimated_cost_usd=0.0,
+                is_estimated=True,
+            ),
+        )
 
 
 class OpenAIProvider:
@@ -82,7 +114,7 @@ class OpenAIProvider:
         user_prompt: str,
         prompt_context: dict[str, Any],
         response_model: type[ModelT],
-    ) -> ModelT:
+    ) -> StructuredGenerationResult:
         del task_name, prompt_version, prompt_context
 
         response = await self._client.responses.parse(
@@ -94,7 +126,17 @@ class OpenAIProvider:
         )
         if response.output_parsed is None:
             raise RuntimeError("OpenAI returned no structured output")
-        return response.output_parsed
+        usage = getattr(response, "usage", None)
+        return StructuredGenerationResult(
+            output=response.output_parsed,
+            usage=ProviderUsage(
+                input_tokens=getattr(usage, "input_tokens", None),
+                output_tokens=getattr(usage, "output_tokens", None),
+                total_tokens=getattr(usage, "total_tokens", None),
+                estimated_cost_usd=None,
+                is_estimated=False,
+            ),
+        )
 
 
 def _mock_classification_payload(prompt_context: dict[str, Any]) -> dict[str, Any]:

@@ -249,6 +249,8 @@ def _render_detail_page(
             _render_evidence(detail),
             "<h2>Approval Controls</h2>",
             _render_approval_controls(detail, operator=operator, csrf_token=csrf_token),
+            "<h2>AI Trace</h2>",
+            _render_ai_trace(detail),
             "<h2>AI Metadata</h2>",
             _render_ai_section(detail),
             "<h2>Approval History</h2>",
@@ -336,6 +338,12 @@ def _render_ai_section(detail: ExceptionCaseDetailResponse) -> str:
         _render_ai_record(detail.latest_remediation.model_dump() if detail.latest_remediation else None),
     ]
     return "".join(parts)
+
+
+def _render_ai_trace(detail: ExceptionCaseDetailResponse) -> str:
+    if detail.ai_trace is None:
+        return "<p>No AI routing trace is available yet.</p>"
+    return _render_json_block(detail.ai_trace.model_dump(mode="json"))
 
 
 def _render_ai_record(record: dict[str, object] | None) -> str:

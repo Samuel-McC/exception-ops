@@ -100,6 +100,15 @@ def reset_ai_settings() -> Generator[None, None, None]:
         "ai_enabled": settings.ai_enabled,
         "ai_provider": settings.ai_provider,
         "ai_model": settings.ai_model,
+        "ai_triage_provider": settings.ai_triage_provider,
+        "ai_triage_model": settings.ai_triage_model,
+        "ai_planner_provider": settings.ai_planner_provider,
+        "ai_planner_model": settings.ai_planner_model,
+        "ai_planner_escalation_provider": settings.ai_planner_escalation_provider,
+        "ai_planner_escalation_model": settings.ai_planner_escalation_model,
+        "ai_fallback_provider": settings.ai_fallback_provider,
+        "ai_fallback_model": settings.ai_fallback_model,
+        "ai_triage_confidence_threshold": settings.ai_triage_confidence_threshold,
         "openai_api_key": settings.openai_api_key,
         "evidence_adapter": settings.evidence_adapter,
         "execution_adapter": settings.execution_adapter,
@@ -112,6 +121,15 @@ def reset_ai_settings() -> Generator[None, None, None]:
     settings.ai_enabled = True
     settings.ai_provider = "mock"
     settings.ai_model = "mock-heuristic-v1"
+    settings.ai_triage_provider = ""
+    settings.ai_triage_model = ""
+    settings.ai_planner_provider = ""
+    settings.ai_planner_model = ""
+    settings.ai_planner_escalation_provider = ""
+    settings.ai_planner_escalation_model = ""
+    settings.ai_fallback_provider = ""
+    settings.ai_fallback_model = ""
+    settings.ai_triage_confidence_threshold = 0.8
     settings.openai_api_key = ""
     settings.evidence_adapter = "mock"
     settings.execution_adapter = "mock"
@@ -126,6 +144,15 @@ def reset_ai_settings() -> Generator[None, None, None]:
         settings.ai_enabled = original["ai_enabled"]
         settings.ai_provider = original["ai_provider"]
         settings.ai_model = original["ai_model"]
+        settings.ai_triage_provider = original["ai_triage_provider"]
+        settings.ai_triage_model = original["ai_triage_model"]
+        settings.ai_planner_provider = original["ai_planner_provider"]
+        settings.ai_planner_model = original["ai_planner_model"]
+        settings.ai_planner_escalation_provider = original["ai_planner_escalation_provider"]
+        settings.ai_planner_escalation_model = original["ai_planner_escalation_model"]
+        settings.ai_fallback_provider = original["ai_fallback_provider"]
+        settings.ai_fallback_model = original["ai_fallback_model"]
+        settings.ai_triage_confidence_threshold = original["ai_triage_confidence_threshold"]
         settings.openai_api_key = original["openai_api_key"]
         settings.evidence_adapter = original["evidence_adapter"]
         settings.execution_adapter = original["execution_adapter"]

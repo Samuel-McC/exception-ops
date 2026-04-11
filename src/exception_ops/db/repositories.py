@@ -151,6 +151,9 @@ def create_ai_record(
     prompt_version: str,
     payload_json: dict[str, Any] | None = None,
     failure_json: dict[str, Any] | None = None,
+    route_json: dict[str, Any] | None = None,
+    usage_json: dict[str, Any] | None = None,
+    trace_json: dict[str, Any] | None = None,
 ) -> AIRecord:
     record = AIRecordRecord(
         record_id=str(uuid4()),
@@ -162,6 +165,9 @@ def create_ai_record(
         prompt_version=prompt_version,
         payload_json=dict(payload_json) if payload_json is not None else None,
         failure_json=dict(failure_json) if failure_json is not None else None,
+        route_json=dict(route_json) if route_json is not None else None,
+        usage_json=dict(usage_json) if usage_json is not None else None,
+        trace_json=dict(trace_json) if trace_json is not None else None,
     )
     session.add(record)
     session.commit()
@@ -470,6 +476,9 @@ def _to_domain_ai_record(record: AIRecordRecord) -> AIRecord:
         prompt_version=record.prompt_version,
         payload_json=dict(record.payload_json) if record.payload_json is not None else None,
         failure_json=dict(record.failure_json) if record.failure_json is not None else None,
+        route_json=dict(record.route_json) if record.route_json is not None else None,
+        usage_json=dict(record.usage_json) if record.usage_json is not None else None,
+        trace_json=dict(record.trace_json) if record.trace_json is not None else None,
         created_at=record.created_at,
     )
 

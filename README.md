@@ -44,7 +44,8 @@ The goal is to build a production-minded automation system, not a generic chatbo
 
 ## Current status
 
-This repo currently implements:
+Stable tagged baseline:
+- V1.0.0 is the completed V1 foundation that shipped:
 - Phase 1 exception ingestion with persistence and ingest audit records
 - Phase 2 Temporal workflow kickoff on exception creation
 - stored workflow linkage on each exception case
@@ -57,13 +58,21 @@ This repo currently implements:
 - Phase 7 bounded evidence collection with additive evidence records, provenance metadata, and evidence-aware AI inputs
 - Phase 8 replay fixtures, deterministic stage replay, and V1 hardening around provider/adapter failure visibility
 
+This V2 branch now adds Phase 1 multi-step AI orchestration:
+- explicit classifier/triage path and planner/remediation path split
+- dedicated routing policy for bounded task/model selection
+- confidence-aware planning escalation
+- optional provider fallback visibility
+- additive routing, usage, cost, and compact trace metadata on `ai_records`
+- operator/detail visibility into which path handled triage/planning and why
+
 When `POST /exceptions` succeeds, the exception case and ingest audit record are always persisted first. The API then attempts workflow kickoff and stores one of:
 - `started`
 - `failed`
 
 This keeps exception ingestion durable even if Temporal is temporarily unavailable.
 
-The safe local default is `AI_PROVIDER=mock`, which produces structured classification and remediation output without requiring external credentials. The OpenAI path is opt-in and remains bounded to structured outputs only.
+The safe local default remains `AI_PROVIDER=mock`, which preserves the V1-compatible single global provider/model path unless you opt into task-specific overrides. The OpenAI path remains opt-in and bounded to structured outputs only.
 
 The safe local default is also `EVIDENCE_ADAPTER=mock`, which collects bounded, explicit evidence records such as:
 - source case payload snapshots
@@ -96,6 +105,13 @@ Phase 8 closes out the current V1 surface with:
 - deterministic local replay through the existing explicit stages and adapters
 - normalized evidence/execution failure metadata for clearer operator and replay inspection
 - clearer demo and operational guidance for local runs
+
+V2 Phase 1 keeps the same workflow order but extends the AI seam:
+- triage/classification and planning/remediation now have explicit task-specific prompt versions
+- routing stays bounded to inspectable task/complexity rules in code
+- fallback and escalation are visible in persisted metadata rather than hidden in helper behavior
+- usage/cost metadata is best-effort and honest, not fake precision
+- the operator UI shows a compact routing trace instead of pseudo-reasoning text
 
 Phase 6 adds a real operator boundary around the review/approval surface:
 - `/health` stays public
@@ -140,7 +156,23 @@ It is still not production-ready:
 - mock adapters remain the default for local safety
 - auth is local/config-backed rather than enterprise IAM
 - replay is fixture/sample-case based rather than a general evaluation platform
-- broader production integrations and multi-model routing are intentionally deferred to V2
+- broader production integrations, generalized agents, and eval-platform behavior are still deferred to later V2 phases
+
+## V2 Phase 1 AI orchestration
+
+The current V2 Phase 1 additions are intentionally narrow:
+- `classification.v3.triage` handles bounded triage on the configured triage path
+- `remediation.v3.plan` handles bounded planning on the configured planner path
+- routing can request a stronger planning path when signals such as low triage confidence, unknown type, incomplete evidence, or higher risk make that worthwhile
+- provider fallback is optional and visible when configured
+- `AI_PROVIDER` / `AI_MODEL` still provide a clean V1-compatible default path when task-specific settings are unset
+
+What this does not add:
+- generalized agents
+- open-ended tool use
+- workflow redesign
+- critique/review loops
+- broad evaluation platforming
 
 ## Database migrations
 

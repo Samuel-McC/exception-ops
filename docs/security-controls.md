@@ -41,6 +41,7 @@ Current implemented controls are still development-oriented, but they include:
 - authenticated operator identity bound to persisted approval decisions
 - replay fixtures and local replay tooling that stay bounded to explicit stages and adapters
 - clearer failure metadata on evidence/execution records for adapter-level inspection
+- additive AI routing, escalation/fallback, usage, and compact trace metadata
 
 ## Planned controls
 
@@ -58,14 +59,17 @@ Current implemented controls are still development-oriented, but they include:
 ### AI safety and control
 - structured outputs
 - provider abstraction
+- explicit routing policy
 - bounded prompts
 - bounded evidence context
 - additive persistence of AI outputs
+- additive persistence of routing/usage/trace metadata
 - AI failure visibility without hidden fallback execution
 - no autonomous risky execution
 - explicit approval for risky actions
 - AI approval hints remain advisory only
 - AI recommended actions remain advisory only
+- operator-visible trace avoids hidden chain-of-thought exposure
 
 ### Evidence safety and control
 - allowlisted evidence adapters only
@@ -91,6 +95,7 @@ Phase 6 adds a real operator boundary, but it remains intentionally small:
 - deployment hardening still depends on environment-specific ingress, TLS, and secret management outside the app
 - evidence gathering is bounded and adapter-backed, not a generalized research or agent system
 - replay is local/dev oriented and should not be treated as a protected production reprocessing surface
+- V2 Phase 1 routing is still bounded orchestration, not generalized agent autonomy
 
 ### Platform hardening
 - dockerized local environment

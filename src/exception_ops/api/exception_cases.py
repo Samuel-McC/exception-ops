@@ -8,7 +8,13 @@ from fastapi import HTTPException, status
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
-from exception_ops.ai.schemas import ClassificationOutput, RemediationPlanOutput
+from exception_ops.ai.schemas import (
+    AIRouteMetadata,
+    AIStageTraceMetadata,
+    AIUsageMetadata,
+    ClassificationOutput,
+    RemediationPlanOutput,
+)
 from exception_ops.db.repositories import (
     create_approval_decision,
     get_exception_case_detail,
@@ -111,6 +117,9 @@ class ClassificationRecordResponse(BaseModel):
     prompt_version: str
     output: ClassificationOutput | None
     failure: dict[str, Any] | None
+    route: AIRouteMetadata | None = None
+    usage: AIUsageMetadata | None = None
+    trace: AIStageTraceMetadata | None = None
     created_at: datetime
 
 
@@ -122,7 +131,28 @@ class RemediationRecordResponse(BaseModel):
     prompt_version: str
     output: RemediationPlanOutput | None
     failure: dict[str, Any] | None
+    route: AIRouteMetadata | None = None
+    usage: AIUsageMetadata | None = None
+    trace: AIStageTraceMetadata | None = None
     created_at: datetime
+
+
+class AICaseTraceStageResponse(BaseModel):
+    model_path: str
+    provider: str
+    model: str
+    prompt_version: str
+    escalation_occurred: bool = False
+    fallback_occurred: bool = False
+    main_factors: list[str] = Field(default_factory=list)
+    summary: str
+
+
+class AICaseTraceResponse(BaseModel):
+    triage: AICaseTraceStageResponse | None = None
+    planning: AICaseTraceStageResponse | None = None
+    escalation_occurred: bool = False
+    fallback_occurred: bool = False
 
 
 class ExceptionCaseResponse(BaseModel):
@@ -147,6 +177,7 @@ class ExceptionCaseResponse(BaseModel):
 class ExceptionCaseDetailResponse(ExceptionCaseResponse):
     audit_history: list[AuditEventResponse] = Field(default_factory=list)
     evidence_history: list[EvidenceRecordResponse] = Field(default_factory=list)
+    ai_trace: AICaseTraceResponse | None = None
     latest_classification: ClassificationRecordResponse | None = None
     latest_remediation: RemediationRecordResponse | None = None
     latest_approval_decision: ApprovalDecisionResponse | None = None
@@ -219,6 +250,7 @@ def build_exception_case_detail_response(
         **build_exception_case_response(detail.exception_case).model_dump(),
         audit_history=[build_audit_event_response(event) for event in detail.audit_history],
         evidence_history=[build_evidence_record_response(item) for item in detail.evidence_history],
+        ai_trace=build_ai_case_trace_response(detail.latest_ai_records),
         latest_classification=build_classification_record_response(
             detail.latest_ai_records.get(AIRecordKind.CLASSIFICATION)
         ),
@@ -412,6 +444,9 @@ def build_classification_record_response(
         prompt_version=ai_record.prompt_version,
         output=output,
         failure=_build_failure_payload(ai_record, output is None),
+        route=_validate_optional_ai_metadata(ai_record.route_json, AIRouteMetadata),
+        usage=_validate_optional_ai_metadata(ai_record.usage_json, AIUsageMetadata),
+        trace=_validate_optional_ai_metadata(ai_record.trace_json, AIStageTraceMetadata),
         created_at=ai_record.created_at,
     )
 
@@ -431,7 +466,52 @@ def build_remediation_record_response(
         prompt_version=ai_record.prompt_version,
         output=output,
         failure=_build_failure_payload(ai_record, output is None),
+        route=_validate_optional_ai_metadata(ai_record.route_json, AIRouteMetadata),
+        usage=_validate_optional_ai_metadata(ai_record.usage_json, AIUsageMetadata),
+        trace=_validate_optional_ai_metadata(ai_record.trace_json, AIStageTraceMetadata),
         created_at=ai_record.created_at,
+    )
+
+
+def build_ai_case_trace_response(
+    latest_ai_records: dict[AIRecordKind, AIRecord],
+) -> AICaseTraceResponse | None:
+    classification_trace = _validate_optional_ai_metadata(
+        latest_ai_records.get(AIRecordKind.CLASSIFICATION).trace_json
+        if latest_ai_records.get(AIRecordKind.CLASSIFICATION) is not None
+        else None,
+        AIStageTraceMetadata,
+    )
+    remediation_trace = _validate_optional_ai_metadata(
+        latest_ai_records.get(AIRecordKind.REMEDIATION).trace_json
+        if latest_ai_records.get(AIRecordKind.REMEDIATION) is not None
+        else None,
+        AIStageTraceMetadata,
+    )
+    if classification_trace is None and remediation_trace is None:
+        return None
+
+    triage = (
+        AICaseTraceStageResponse.model_validate(classification_trace.model_dump(mode="json"))
+        if classification_trace is not None
+        else None
+    )
+    planning = (
+        AICaseTraceStageResponse.model_validate(remediation_trace.model_dump(mode="json"))
+        if remediation_trace is not None
+        else None
+    )
+    return AICaseTraceResponse(
+        triage=triage,
+        planning=planning,
+        escalation_occurred=bool(
+            (triage.escalation_occurred if triage is not None else False)
+            or (planning.escalation_occurred if planning is not None else False)
+        ),
+        fallback_occurred=bool(
+            (triage.fallback_occurred if triage is not None else False)
+            or (planning.fallback_occurred if planning is not None else False)
+        ),
     )
 
 
@@ -441,6 +521,18 @@ def _validate_ai_payload(ai_record: AIRecord, payload_model: type[BaseModel]) ->
 
     try:
         return payload_model.model_validate(ai_record.payload_json)
+    except ValidationError:
+        return None
+
+
+def _validate_optional_ai_metadata(
+    payload_json: dict[str, Any] | None,
+    payload_model: type[BaseModel],
+) -> BaseModel | None:
+    if payload_json is None:
+        return None
+    try:
+        return payload_model.model_validate(payload_json)
     except ValidationError:
         return None
 

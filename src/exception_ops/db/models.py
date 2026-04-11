@@ -154,6 +154,9 @@ class AIRecordRecord(Base):
     prompt_version: Mapped[str] = mapped_column(String(255), nullable=False)
     payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     failure_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    route_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    usage_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    trace_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -11,7 +11,7 @@ from exception_ops.api import app as app_module
 from exception_ops.config import settings
 
 
-def test_alembic_upgrade_creates_phase7_schema(tmp_path: Path, monkeypatch) -> None:
+def test_alembic_upgrade_creates_v2_phase1_schema(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "alembic-phase4.sqlite3"
     database_url = f"sqlite+pysqlite:///{database_path}"
     monkeypatch.setattr(settings, "database_url", database_url)
@@ -60,6 +60,23 @@ def test_alembic_upgrade_creates_phase7_schema(tmp_path: Path, monkeypatch) -> N
         "failure_json",
         "collected_at",
     }.issubset(evidence_columns)
+
+    ai_record_columns = {column["name"] for column in inspector.get_columns("ai_records")}
+    assert {
+        "record_id",
+        "case_id",
+        "record_kind",
+        "status",
+        "provider",
+        "model",
+        "prompt_version",
+        "payload_json",
+        "failure_json",
+        "route_json",
+        "usage_json",
+        "trace_json",
+        "created_at",
+    }.issubset(ai_record_columns)
 
 
 def test_app_startup_skips_create_all_when_db_auto_create_disabled(monkeypatch) -> None:
